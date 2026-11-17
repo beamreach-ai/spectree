@@ -1,0 +1,26 @@
+name: Spectree
+# This repository uses spectree on itself. Other repositories get this file from `spectree init`,
+# where it calls beamreach-ai/spectree/.github/workflows/spectree.yml@v1.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled, ready_for_review]
+  workflow_run:
+    workflows: ["Spectree signal"]
+    types: [completed]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  statuses: write
+  pages: write
+  id-token: write
+
+jobs:
+  spectree:
+    uses: ./.github/workflows/spectree.yml

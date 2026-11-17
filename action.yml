@@ -1,0 +1,23 @@
+name: Spectree
+description: Specs as a tree in your repository. Propose a spec, vote on it, then add the code, in one pull request.
+branding:
+  icon: git-pull-request
+  color: blue
+inputs:
+  token:
+    description: Token that may write statuses, comments and labels on pull requests.
+    default: ${{ github.token }}
+  default_branch:
+    description: The branch that holds the approved specs. Default is the repository's default branch.
+  bot:
+    description: Login of the account the token belongs to. Approval records are trusted only in its comments.
+    default: github-actions[bot]
+  site_dir:
+    description: Where the dashboard is written.
+    default: _spectree_site
+outputs:
+  dashboard:
+    description: true when the dashboard was built.
+runs:
+  using: node20
+  main: dist/index.cjs

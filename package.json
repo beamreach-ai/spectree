@@ -1,0 +1,27 @@
+{
+  "name": "spectree",
+  "version": "0.1.0",
+  "description": "Specs as a tree in your repo: propose a spec, vote on it, then add the code. One pull request, two phases.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.cjs && esbuild src/bin.ts --bundle --platform=node --target=node20 --format=cjs --banner:js=\"#!/usr/bin/env node\" --outfile=dist/cli.cjs",
+    "test": "node --test \"test/*.test.ts\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "picomatch": "^4.0.7",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/picomatch": "^4.0.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "bin": {
+    "spectree": "dist/cli.cjs"
+  }
+}

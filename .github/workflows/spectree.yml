@@ -1,0 +1,47 @@
+name: Spectree (reusable)
+# Called from a repository's own workflow. See docs/setup.md.
+# It checks out the default branch only. Pull requests are read through the API as data and their code never runs.
+on:
+  workflow_call:
+
+concurrency:
+  group: spectree-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      statuses: write
+    outputs:
+      dashboard: ${{ steps.run.outputs.dashboard }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - id: run
+        uses: beamreach-ai/spectree@v1
+      - if: steps.run.outputs.dashboard == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _spectree_site
+
+  publish:
+    needs: evaluate
+    if: needs.evaluate.outputs.dashboard == 'true'
+    # A repository without GitHub Pages still gets the checks and the vote count.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
