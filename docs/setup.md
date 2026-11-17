@@ -45,7 +45,7 @@ count_author: true                # the author counts as one vote for
 ratings: {}                       # vote weight per user, e.g. {alex: 5}
 exempt_paths: ["**/*.md", ".github/**"]             # changes here need no spec
 exempt_authors: ["dependabot[bot]", "renovate[bot]"]
-on_missing_spec: fail             # fail, or close the pull request as well
+on_missing_spec: fail             # fail, close the pull request as well, or allow code without a spec
 dashboard:
   enabled: true
   path: ""                        # publish the page under this path
@@ -93,6 +93,7 @@ A group only organises its children, so it needs no code and can merge when the 
 ### Bringing an existing project in
 
 - **Features you already built:** write each as a leaf whose criteria name tests that exist. Such a leaf merges without code and shows as done.
+- **While you try it:** set `on_missing_spec: allow`. Pull requests without a spec pass as before, and pull requests with a spec get the vote and the checks.
 - **Your backlog:** write each item as a leaf with `planned: now`, `planned: next` or `planned: later`. It needs only a title and shows as planned.
 
 Check the tree locally at any time:

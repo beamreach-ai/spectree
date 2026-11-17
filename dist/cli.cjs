@@ -7428,8 +7428,8 @@ function loadConfig(text) {
         else errors.push(`${key} must be a list`);
         break;
       case "on_missing_spec":
-        if (value === "fail" || value === "close") config.on_missing_spec = value;
-        else errors.push("on_missing_spec must be fail or close");
+        if (value === "fail" || value === "close" || value === "allow") config.on_missing_spec = value;
+        else errors.push("on_missing_spec must be fail, close or allow");
         break;
       case "dashboard": {
         const d = value;

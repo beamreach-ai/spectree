@@ -127,7 +127,7 @@ A PR that changes code and belongs to no approved spec fails `spectree/spec`. Ex
 - the author is in `exempt_authors` (default: `dependabot[bot]`, `renovate[bot]`);
 - a maintainer added the label `no-spec`.
 
-`on_missing_spec` decides what happens: `fail` (default) reports the failed check and one comment, and `close` also closes the PR.
+`on_missing_spec` decides what happens: `fail` (default) reports the failed check and one comment, and `close` also closes the PR. `allow` lets code without a spec pass, for a project that is trying spectree out.
 
 ## 5. Votes
 

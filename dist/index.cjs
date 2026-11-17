@@ -9304,8 +9304,8 @@ function loadConfig(text) {
         else errors.push(`${key} must be a list`);
         break;
       case "on_missing_spec":
-        if (value === "fail" || value === "close") config.on_missing_spec = value;
-        else errors.push("on_missing_spec must be fail or close");
+        if (value === "fail" || value === "close" || value === "allow") config.on_missing_spec = value;
+        else errors.push("on_missing_spec must be fail, close or allow");
         break;
       case "dashboard": {
         const d = value;
@@ -9624,6 +9624,8 @@ function evaluatePr(input, cfg) {
       return { ...base, statuses: { spec: ok(`No spec needed: ${input.author} is exempt`), phase: na, scope: na } };
     if (input.labels.includes(LABEL_NO_SPEC))
       return { ...base, statuses: { spec: ok(`No spec needed: a maintainer added the ${LABEL_NO_SPEC} label`), phase: na, scope: na } };
+    if (cfg.on_missing_spec === "allow")
+      return { ...base, statuses: { spec: ok("No spec. This project does not require one yet"), phase: na, scope: na } };
     return {
       ...base,
       phase: "missing",

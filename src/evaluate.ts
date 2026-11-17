@@ -107,6 +107,8 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
       return { ...base, statuses: { spec: ok(`No spec needed: ${input.author} is exempt`), phase: na, scope: na } };
     if (input.labels.includes(LABEL_NO_SPEC))
       return { ...base, statuses: { spec: ok(`No spec needed: a maintainer added the ${LABEL_NO_SPEC} label`), phase: na, scope: na } };
+    if (cfg.on_missing_spec === "allow")
+      return { ...base, statuses: { spec: ok("No spec. This project does not require one yet"), phase: na, scope: na } };
     return {
       ...base,
       phase: "missing",

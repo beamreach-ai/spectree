@@ -212,3 +212,10 @@ test("existing code: a leaf whose tests are all in the default branch can merge 
   const fresh = evaluatePr(pr({ reviews: [approve("maint")] }), DEFAULTS);
   assert.equal(fresh.statuses.phase.state, "pending");
 });
+
+test("on_missing_spec allow: code without a spec passes and gets no comment", () => {
+  const r = evaluatePr(pr({ files: [code("src/main.py", "modified")], specContents: {} }), { ...DEFAULTS, on_missing_spec: "allow" });
+  assert.equal(r.statuses.spec.state, "success");
+  assert.equal(r.comment, null);
+  assert.equal(r.phase, "none");
+});
