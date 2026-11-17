@@ -9,6 +9,7 @@ No file stores a status. Each run works it out:
 | Status | Rule |
 |---|---|
 | Done | The node is in the default branch |
+| Planned | The node is in the default branch and its header has `planned` |
 | Proposed | An open pull request adds or changes the node, and the vote has not passed |
 | Approved | The vote passed, and the pull request holds no code |
 | In progress | The vote passed, and the pull request holds code |
@@ -39,7 +40,7 @@ A record is trusted only in a comment written by the workflow's own account. A r
 | Check | Passes when |
 |---|---|
 | `spectree/spec` | The changed specs are valid and the vote passed. Or the pull request needs no spec |
-| `spectree/phase` | No code before approval. A leaf has code before merge. In `maintainers` mode, the code's author has write access |
+| `spectree/phase` | No code before approval. A leaf has code before merge, unless it is planned or every test it names is already in the default branch. In `maintainers` mode, the code's author has write access |
 | `spectree/scope` | Every changed file outside `roadmap/` matches a path of a leaf in the pull request, and every test file named by a criterion exists |
 
 Exempt files are not counted as code and are not checked against the paths.

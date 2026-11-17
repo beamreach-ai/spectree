@@ -13,6 +13,8 @@ export interface Spec {
   kind: "leaf" | "group";
   paths: string[];
   criteria: Criterion[];
+  /** Set on a leaf that is agreed but not built. The text is the horizon, e.g. `now`, `next`, `later`; empty when none was given. */
+  planned: string | null;
   body: string;
 }
 
@@ -55,16 +57,24 @@ export function parseSpec(id: string, content: string): { spec: Spec | null; err
   if (!title) errors.push(`${at}: title is required`);
   const kind = h.kind === undefined ? "leaf" : h.kind;
   if (kind !== "leaf" && kind !== "group") errors.push(`${at}: kind must be leaf or group`);
-  const known = new Set(["title", "kind", "paths", "criteria"]);
+  const known = new Set(["title", "kind", "paths", "criteria", "planned"]);
   for (const k of Object.keys(h)) if (!known.has(k)) errors.push(`${at}: unknown header key "${k}"`);
 
   let paths: string[] = [];
   const criteria: Criterion[] = [];
+  let planned: string | null = null;
+  if (h.planned !== undefined && h.planned !== false) {
+    if (h.planned === true) planned = "";
+    else if (typeof h.planned === "string" && h.planned.trim()) planned = h.planned.trim();
+    else errors.push(`${at}: planned must be true or a short text such as now, next or later`);
+  }
   if (kind === "group") {
+    if (planned !== null) errors.push(`${at}: a group cannot be planned; mark its leaves`);
     if (h.paths !== undefined) errors.push(`${at}: a group has no paths`);
     if (h.criteria !== undefined) errors.push(`${at}: a group has no criteria`);
   } else if (kind === "leaf") {
     if (strList(h.paths) && h.paths.length) paths = h.paths;
+    else if (planned !== null && h.paths === undefined) paths = [];
     else errors.push(`${at}: a leaf needs paths, a list of the files the implementation may touch`);
     if (Array.isArray(h.criteria) && h.criteria.length) {
       const seen = new Set<string>();
@@ -81,10 +91,10 @@ export function parseSpec(id: string, content: string): { spec: Spec | null; err
         if (!strList(o.tests) || !o.tests.length) errors.push(`${where} needs tests, a list with at least one test file`);
         criteria.push({ id: cid, text, tests: strList(o.tests) ? o.tests : [] });
       });
-    } else errors.push(`${at}: a leaf needs at least one criterion`);
+    } else if (!(planned !== null && h.criteria === undefined)) errors.push(`${at}: a leaf needs at least one criterion`);
   }
   if (errors.length) return { spec: null, errors };
-  return { spec: { id, title, kind: kind as "leaf" | "group", paths, criteria, body: m[2].trim() }, errors };
+  return { spec: { id, title, kind: kind as "leaf" | "group", paths, criteria, planned, body: m[2].trim() }, errors };
 }
 
 /** Every ancestor of a node must itself be a node. `known` holds all node ids after the change. */

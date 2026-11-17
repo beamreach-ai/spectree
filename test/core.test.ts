@@ -181,3 +181,34 @@ test("flow: pull requests with no spec", () => {
   r = noSpec({ files: [code("docs/guide.md"), code(".github/workflows/ci.yml")] });
   assert.deepEqual([r.phase, r.statuses.spec.state, r.comment], ["none", "success", null]);
 });
+
+const PLANNED = `---\ntitle: Offline search\nplanned: next\n---\nAgreed, not built.\n`;
+
+test("planned: a planned leaf needs no paths, no criteria and no code; code for it is out of scope", () => {
+  const parsed = parseSpec("search/offline", PLANNED);
+  assert.deepEqual(parsed.errors, []);
+  assert.equal(parsed.spec!.planned, "next");
+  assert.equal(parseSpec("a", "---\ntitle: T\nplanned: true\n---\n").spec!.planned, "");
+  assert.equal(parseSpec("a", LEAF).spec!.planned, null);
+  assert.match(parseSpec("a", "---\ntitle: T\nkind: group\nplanned: now\n---\n").errors[0], /a group cannot be planned/);
+
+  const file = "roadmap/search/offline/spec.md";
+  const base = { files: [spec(file)], specContents: { [file]: PLANNED }, reviews: [approve("maint")] };
+  const only = evaluatePr(pr(base), DEFAULTS);
+  assert.equal(only.phase, "approved");
+  assert.equal(only.statuses.phase.state, "success");
+  assert.match(only.statuses.phase.description, /planned leaf needs no code/);
+  assert.match(only.comment!, /can merge/);
+
+  const withCode = evaluatePr(pr({ ...base, files: [spec(file), code("src/offline.py")] }), DEFAULTS);
+  assert.equal(withCode.statuses.scope.state, "failure");
+});
+
+test("existing code: a leaf whose tests are all in the default branch can merge without code", () => {
+  const baseFiles = new Set(["README.md", "src/index/a.py", "tests/index/test_incremental.py"]);
+  const r = evaluatePr(pr({ reviews: [approve("maint")], baseFiles }), DEFAULTS);
+  assert.equal(r.statuses.phase.state, "success");
+  assert.match(r.statuses.phase.description, /describes existing code/);
+  const fresh = evaluatePr(pr({ reviews: [approve("maint")] }), DEFAULTS);
+  assert.equal(fresh.statuses.phase.state, "pending");
+});

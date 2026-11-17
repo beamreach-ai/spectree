@@ -7467,15 +7467,23 @@ function parseSpec(id, content) {
   if (!title) errors.push(`${at}: title is required`);
   const kind = h.kind === void 0 ? "leaf" : h.kind;
   if (kind !== "leaf" && kind !== "group") errors.push(`${at}: kind must be leaf or group`);
-  const known = /* @__PURE__ */ new Set(["title", "kind", "paths", "criteria"]);
+  const known = /* @__PURE__ */ new Set(["title", "kind", "paths", "criteria", "planned"]);
   for (const k of Object.keys(h)) if (!known.has(k)) errors.push(`${at}: unknown header key "${k}"`);
   let paths = [];
   const criteria = [];
+  let planned = null;
+  if (h.planned !== void 0 && h.planned !== false) {
+    if (h.planned === true) planned = "";
+    else if (typeof h.planned === "string" && h.planned.trim()) planned = h.planned.trim();
+    else errors.push(`${at}: planned must be true or a short text such as now, next or later`);
+  }
   if (kind === "group") {
+    if (planned !== null) errors.push(`${at}: a group cannot be planned; mark its leaves`);
     if (h.paths !== void 0) errors.push(`${at}: a group has no paths`);
     if (h.criteria !== void 0) errors.push(`${at}: a group has no criteria`);
   } else if (kind === "leaf") {
     if (strList(h.paths) && h.paths.length) paths = h.paths;
+    else if (planned !== null && h.paths === void 0) paths = [];
     else errors.push(`${at}: a leaf needs paths, a list of the files the implementation may touch`);
     if (Array.isArray(h.criteria) && h.criteria.length) {
       const seen = /* @__PURE__ */ new Set();
@@ -7492,10 +7500,10 @@ function parseSpec(id, content) {
         if (!strList(o.tests) || !o.tests.length) errors.push(`${where} needs tests, a list with at least one test file`);
         criteria.push({ id: cid, text, tests: strList(o.tests) ? o.tests : [] });
       });
-    } else errors.push(`${at}: a leaf needs at least one criterion`);
+    } else if (!(planned !== null && h.criteria === void 0)) errors.push(`${at}: a leaf needs at least one criterion`);
   }
   if (errors.length) return { spec: null, errors };
-  return { spec: { id, title, kind, paths, criteria, body: m[2].trim() }, errors };
+  return { spec: { id, title, kind, paths, criteria, planned, body: m[2].trim() }, errors };
 }
 function missingAncestors(id, known) {
   const missing = [];
@@ -7513,11 +7521,12 @@ function levelName(id, levels) {
 
 // src/dashboard.ts
 var statusOf = (phase) => phase === "code" ? "in_progress" : phase === "approved" ? "approved" : "proposed";
-var zero = () => ({ done: 0, proposed: 0, approved: 0, in_progress: 0 });
+var zero = () => ({ done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 0 });
 function buildData(mainSpecs, prs, cfg, repository, now) {
   const flat = /* @__PURE__ */ new Map();
-  const make = (id, title, kind, status) => ({
+  const make = (id, title, kind, status, horizon = "") => ({
     id,
+    horizon,
     name: id.split("/").pop(),
     title,
     kind,
@@ -7527,7 +7536,7 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     counts: zero(),
     children: []
   });
-  for (const s of Object.values(mainSpecs)) flat.set(s.id, make(s.id, s.title, s.kind, "done"));
+  for (const s of Object.values(mainSpecs)) flat.set(s.id, make(s.id, s.title, s.kind, s.planned === null ? "done" : "planned", s.planned ?? ""));
   const proposals = [];
   for (const p of prs) {
     const r = p.result;
@@ -7573,14 +7582,15 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
   return { repository, generated: now, threshold: cfg.threshold, levels: cfg.levels, proposals, tree: roots };
 }
 var esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-var LABEL = { done: "Done", in_progress: "In progress", approved: "Approved", proposed: "Proposed" };
-var ORDER = ["done", "in_progress", "approved", "proposed"];
+var LABEL = { done: "Done", planned: "Planned", in_progress: "In progress", approved: "Approved", proposed: "Proposed" };
+var ORDER = ["done", "in_progress", "approved", "proposed", "planned"];
 var pill = (s, text = LABEL[s]) => `<span class="pill ${s}">${esc(text)}</span>`;
 function renderNode(n, repoUrl, root) {
   const counts = n.kind === "group" ? ORDER.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ") : "";
   const open = n.open.map((o) => `<a class="pr" href="${repoUrl}/pull/${o.pr}">#${o.pr} ${o.change === "added" ? "" : o.change + ", "}${LABEL[o.status].toLowerCase()}</a>`).join(" ");
-  const href = n.status === "done" ? `${repoUrl}/blob/HEAD/${root}/${n.id}/spec.md` : n.open[0] ? `${repoUrl}/pull/${n.open[0].pr}` : "#";
-  const head = `<span class="level">${esc(n.level)}</span> <a class="title" href="${href}">${esc(n.title)}</a> <code>${esc(n.name)}</code> ${n.kind === "leaf" ? pill(n.status) : counts || pill(n.status)} ${n.status === "done" || n.kind === "group" ? open : ""}`;
+  const inMain = n.status === "done" || n.status === "planned";
+  const href = inMain ? `${repoUrl}/blob/HEAD/${root}/${n.id}/spec.md` : n.open[0] ? `${repoUrl}/pull/${n.open[0].pr}` : "#";
+  const head = `<span class="level">${esc(n.level)}</span> <a class="title" href="${href}">${esc(n.title)}</a> <code>${esc(n.name)}</code> ${n.kind === "leaf" ? pill(n.status, n.status === "planned" && n.horizon ? `Planned: ${n.horizon}` : LABEL[n.status]) : counts || pill(n.status)} ${inMain || n.kind === "group" ? open : ""}`;
   if (!n.children.length) return `<li class="node"><div class="row">${head}</div></li>`;
   return `<li class="node"><details open><summary class="row">${head}</summary><ul>${n.children.map((c) => renderNode(c, repoUrl, root)).join("")}</ul></details></li>`;
 }
@@ -7619,6 +7629,7 @@ code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .pill.done{color:var(--done);background:var(--done-bg)}.pill.in_progress{color:var(--prog);background:var(--prog-bg)}
 .pill.approved{color:var(--appr);background:var(--appr-bg)}.pill.proposed{color:var(--prop);background:var(--prop-bg)}
+.pill.planned{color:var(--muted);background:var(--line)}
 .pill.bad{color:var(--bad);background:var(--bad-bg)}
 .box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 16px;overflow-x:auto}
 table{border-collapse:collapse;width:100%;min-width:560px}
@@ -7643,7 +7654,7 @@ footer{margin-top:40px}
 <div class="box">${proposals}</div>
 <h2>Specs</h2>
 <div class="box">${tree}</div>
-<footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
+<footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
 </body>
 </html>

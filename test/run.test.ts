@@ -116,7 +116,7 @@ test("sweep: vote, approval record, code phase, a second sweep writes nothing, d
   assert.deepEqual(["spec", "phase", "scope"].map((c) => status(state, "h2", `spectree/${c}`)), ["success", "success", "success"]);
   data = JSON.parse(readFileSync(join(site, "roadmap.json"), "utf8"));
   assert.equal(data.tree[0].children[0].status, "in_progress");
-  assert.deepEqual(data.tree[0].counts, { done: 0, proposed: 0, approved: 0, in_progress: 1 });
+  assert.deepEqual(data.tree[0].counts, { done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 1 });
   const html = readFileSync(join(site, "index.html"), "utf8");
   assert.match(html, /Incremental indexing/);
   assert.match(html, /In progress/);

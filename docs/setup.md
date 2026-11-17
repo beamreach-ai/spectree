@@ -90,6 +90,11 @@ What search should become.
 
 A group only organises its children, so it needs no code and can merge when the vote passes. A leaf, the default kind, describes a change to the code. See [contributing-with-specs.md](contributing-with-specs.md) for the leaf format.
 
+### Bringing an existing project in
+
+- **Features you already built:** write each as a leaf whose criteria name tests that exist. Such a leaf merges without code and shows as done.
+- **Your backlog:** write each item as a leaf with `planned: now`, `planned: next` or `planned: later`. It needs only a title and shows as planned.
+
 Check the tree locally at any time:
 
 ```sh

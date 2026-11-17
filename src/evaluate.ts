@@ -52,6 +52,8 @@ export interface NodeChange {
   title: string;
   kind: "leaf" | "group";
   change: "added" | "changed" | "removed";
+  /** The horizon of a planned leaf; null when the leaf is to be built now. */
+  planned: string | null;
 }
 
 export interface PrResult {
@@ -129,7 +131,7 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
     const id = nodeIdOf(cfg.root, f.path)!;
     const before = input.baseSpecs[id];
     if (f.status === "removed") {
-      if (before) nodes.push({ id, title: before.title, kind: before.kind, change: "removed" });
+      if (before) nodes.push({ id, title: before.title, kind: before.kind, change: "removed", planned: before.planned });
       continue;
     }
     const content = input.specContents[f.path];
@@ -141,7 +143,7 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
     errors.push(...parsed.errors);
     if (parsed.spec) {
       headSpecs[id] = parsed.spec;
-      nodes.push({ id, title: parsed.spec.title, kind: parsed.spec.kind, change: before ? "changed" : "added" });
+      nodes.push({ id, title: parsed.spec.title, kind: parsed.spec.kind, change: before ? "changed" : "added", planned: parsed.spec.planned });
     }
   }
   const removed = new Set(nodes.filter((n) => n.change === "removed").map((n) => n.id));
@@ -170,6 +172,17 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
   const shown = record ? record.tally : live;
   const hasCode = codeFiles.length > 0;
   const leaves = nodes.filter((n) => n.kind === "leaf");
+  // A planned leaf is a roadmap entry and takes no code. A leaf whose tests are all in the default branch describes code that exists.
+  const baseHas = (glob: string) => {
+    const hit = picomatch(glob, { dot: true });
+    return [...(input.baseFiles ?? [])].some((p) => hit(p));
+  };
+  const built = (id: string) => {
+    const tests = (headSpecs[id]?.criteria ?? []).flatMap((c) => c.tests);
+    return input.baseFiles !== null && tests.length > 0 && tests.every(baseHas);
+  };
+  const toBuild = leaves.filter((n) => n.change !== "removed" && n.planned === null);
+  const needCode = toBuild.filter((n) => !built(n.id));
   const phase: Phase = approved ? (hasCode ? "code" : "approved") : "spec";
 
   const spec: Status = errors.length
@@ -184,12 +197,16 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
   else if (hasCode && cfg.implementation === "maintainers" && !input.authorCanWrite)
     phaseStatus = fail("In this project only maintainers write the code for an approved spec");
   else if (hasCode) phaseStatus = ok("Code phase: the spec is approved and frozen");
-  else if (leaves.length) phaseStatus = wait("Spec approved. Add the code to this pull request");
+  else if (needCode.length) phaseStatus = wait("Spec approved. Add the code to this pull request");
+  else if (toBuild.length) phaseStatus = ok("Spec approved. Its tests are already in the default branch, so it describes existing code");
+  else if (leaves.length) phaseStatus = ok("Spec approved. A planned leaf needs no code");
   else phaseStatus = ok("Spec approved. A group needs no code");
 
   let scope: Status = ok(hasCode ? "Checked" : "No code yet");
   if (hasCode && !errors.length) {
-    const allowedGlobs = leaves.flatMap((n) => [...(headSpecs[n.id]?.paths ?? []), ...(input.baseSpecs[n.id]?.paths ?? [])]);
+    const allowedGlobs = leaves
+      .filter((n) => n.planned === null)
+      .flatMap((n) => [...(headSpecs[n.id]?.paths ?? []), ...(input.baseSpecs[n.id]?.paths ?? [])]);
     const allowed = matcher(allowedGlobs);
     const outside = codeFiles.filter((f) => !allowed(f.path)).map((f) => f.path);
     const missingTests: string[] = [];
@@ -216,7 +233,7 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
         ? "Remove the code from this pull request until the vote passes."
         : 'Vote with a review: "Approve" is for, "Request changes" is against.'
       : phase === "approved"
-        ? leaves.length
+        ? needCode.length
           ? "The spec is frozen. Add the code to this pull request."
           : "This pull request can merge."
         : "The spec is frozen. The code goes through normal review.";
@@ -234,7 +251,7 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
     ...votes,
     "",
     ...(errors.length ? ["**Problems in the spec:**", ...errors.map((e) => `- ${e}`), ""] : []),
-    ...(nodes.length ? ["**Specs in this pull request:**", ...nodes.map((n) => `- \`${n.id}\` (${n.kind}, ${n.change}): ${n.title}`), ""] : []),
+    ...(nodes.length ? ["**Specs in this pull request:**", ...nodes.map((n) => `- \`${n.id}\` (${n.planned !== null ? "planned " : ""}${n.kind}, ${n.change}): ${n.title}`), ""] : []),
     ...(record ? [`Approved at commit ${record.commit.slice(0, 7)}${record.pr !== input.number ? ` in #${record.pr}` : ""}, spec digest \`${record.digest.slice(0, 19)}\`.`, ""] : []),
     `**Next:** ${next}`,
   ].join("\n");

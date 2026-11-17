@@ -40,6 +40,7 @@ Why this is needed, what it does, and what it does not do.
 | `kind` | `leaf` (default) for a change to the code, `group` for a node that only organises others |
 | `paths` | The files your implementation may touch. Globs are allowed |
 | `criteria` | What must be true when it is done. Each has an `id`, a `text` and the test files that will prove it |
+| `planned` | `true`, or a horizon such as `now`, `next` or `later`. The leaf is a roadmap entry: it needs no paths, no criteria and no code. Remove the field in the pull request that builds it |
 
 The parent directory must already be a node, or be added in the same pull request.
 

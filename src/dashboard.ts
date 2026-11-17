@@ -2,7 +2,7 @@ import type { Config } from "./config.ts";
 import type { NodeChange, Phase, PrResult } from "./evaluate.ts";
 import { type Spec, levelName } from "./tree.ts";
 
-export type NodeStatus = "done" | "proposed" | "approved" | "in_progress";
+export type NodeStatus = "done" | "planned" | "proposed" | "approved" | "in_progress";
 
 export interface OpenChange {
   pr: number;
@@ -17,6 +17,8 @@ export interface DashNode {
   kind: "leaf" | "group";
   level: string;
   status: NodeStatus;
+  /** For a planned leaf: its horizon, e.g. `now`. */
+  horizon: string;
   /** Open pull requests that add, change or remove this node. */
   open: OpenChange[];
   /** For a group: how many leaves below it have each status. */
@@ -57,15 +59,15 @@ export interface PrSummary {
 }
 
 const statusOf = (phase: Phase): NodeStatus => (phase === "code" ? "in_progress" : phase === "approved" ? "approved" : "proposed");
-const zero = (): Record<NodeStatus, number> => ({ done: 0, proposed: 0, approved: 0, in_progress: 0 });
+const zero = (): Record<NodeStatus, number> => ({ done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 0 });
 
 /** The roadmap: the default branch's nodes are done; open spec pull requests add the other three statuses. */
 export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg: Config, repository: string, now: string): DashData {
   const flat = new Map<string, DashNode>();
-  const make = (id: string, title: string, kind: "leaf" | "group", status: NodeStatus): DashNode => ({
-    id, name: id.split("/").pop()!, title, kind, level: levelName(id, cfg.levels), status, open: [], counts: zero(), children: [],
+  const make = (id: string, title: string, kind: "leaf" | "group", status: NodeStatus, horizon = ""): DashNode => ({
+    id, horizon, name: id.split("/").pop()!, title, kind, level: levelName(id, cfg.levels), status, open: [], counts: zero(), children: [],
   });
-  for (const s of Object.values(mainSpecs)) flat.set(s.id, make(s.id, s.title, s.kind, "done"));
+  for (const s of Object.values(mainSpecs)) flat.set(s.id, make(s.id, s.title, s.kind, s.planned === null ? "done" : "planned", s.planned ?? ""));
 
   const proposals: DashPr[] = [];
   for (const p of prs) {
@@ -105,8 +107,8 @@ export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-const LABEL: Record<NodeStatus, string> = { done: "Done", in_progress: "In progress", approved: "Approved", proposed: "Proposed" };
-const ORDER: NodeStatus[] = ["done", "in_progress", "approved", "proposed"];
+const LABEL: Record<NodeStatus, string> = { done: "Done", planned: "Planned", in_progress: "In progress", approved: "Approved", proposed: "Proposed" };
+const ORDER: NodeStatus[] = ["done", "in_progress", "approved", "proposed", "planned"];
 const pill = (s: NodeStatus, text = LABEL[s]) => `<span class="pill ${s}">${esc(text)}</span>`;
 
 function renderNode(n: DashNode, repoUrl: string, root: string): string {
@@ -114,10 +116,11 @@ function renderNode(n: DashNode, repoUrl: string, root: string): string {
   const open = n.open
     .map((o) => `<a class="pr" href="${repoUrl}/pull/${o.pr}">#${o.pr} ${o.change === "added" ? "" : o.change + ", "}${LABEL[o.status].toLowerCase()}</a>`)
     .join(" ");
-  const href = n.status === "done" ? `${repoUrl}/blob/HEAD/${root}/${n.id}/spec.md` : n.open[0] ? `${repoUrl}/pull/${n.open[0].pr}` : "#";
+  const inMain = n.status === "done" || n.status === "planned";
+  const href = inMain ? `${repoUrl}/blob/HEAD/${root}/${n.id}/spec.md` : n.open[0] ? `${repoUrl}/pull/${n.open[0].pr}` : "#";
   const head = `<span class="level">${esc(n.level)}</span> <a class="title" href="${href}">${esc(n.title)}</a> <code>${esc(n.name)}</code> ${
-    n.kind === "leaf" ? pill(n.status) : counts || pill(n.status)
-  } ${n.status === "done" || n.kind === "group" ? open : ""}`;
+    n.kind === "leaf" ? pill(n.status, n.status === "planned" && n.horizon ? `Planned: ${n.horizon}` : LABEL[n.status]) : counts || pill(n.status)
+  } ${inMain || n.kind === "group" ? open : ""}`;
   if (!n.children.length) return `<li class="node"><div class="row">${head}</div></li>`;
   return `<li class="node"><details open><summary class="row">${head}</summary><ul>${n.children.map((c) => renderNode(c, repoUrl, root)).join("")}</ul></details></li>`;
 }
@@ -168,6 +171,7 @@ code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .pill.done{color:var(--done);background:var(--done-bg)}.pill.in_progress{color:var(--prog);background:var(--prog-bg)}
 .pill.approved{color:var(--appr);background:var(--appr-bg)}.pill.proposed{color:var(--prop);background:var(--prop-bg)}
+.pill.planned{color:var(--muted);background:var(--line)}
 .pill.bad{color:var(--bad);background:var(--bad-bg)}
 .box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 16px;overflow-x:auto}
 table{border-collapse:collapse;width:100%;min-width:560px}
@@ -192,7 +196,7 @@ footer{margin-top:40px}
 <div class="box">${proposals}</div>
 <h2>Specs</h2>
 <div class="box">${tree}</div>
-<footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
+<footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
 </body>
 </html>
