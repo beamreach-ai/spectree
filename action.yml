@@ -19,5 +19,5 @@ outputs:
   dashboard:
     description: true when the dashboard was built.
 runs:
-  using: node20
+  using: node24
   main: dist/index.cjs
