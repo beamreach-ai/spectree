@@ -9254,7 +9254,7 @@ var DEFAULTS = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
-  dashboard: { enabled: true, path: "" }
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "" }
 };
 function loadConfig(text) {
   const errors = [];
@@ -9312,6 +9312,16 @@ function loadConfig(text) {
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          if (d.host !== void 0) {
+            if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
+            else errors.push("dashboard.host must be github-pages or cloudflare");
+          }
+          if (d.project !== void 0) {
+            if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;
+            else errors.push("dashboard.project must be a Cloudflare Pages project name: lowercase letters, digits and dashes");
+          }
+          if (config.dashboard.host === "cloudflare" && !config.dashboard.project) errors.push("dashboard.host cloudflare needs dashboard.project, the Cloudflare Pages project");
         } else errors.push("dashboard must be a mapping");
         break;
       }
@@ -9915,7 +9925,7 @@ async function run(o) {
     (0, import_node_fs.writeFileSync)((0, import_node_path.join)(dir, "roadmap.json"), JSON.stringify(data, null, 2) + "\n");
     o.log(`dashboard: ${Object.keys(main2.specs).length} specs in ${o.defaultBranch}, ${data.proposals.length} open proposals`);
   }
-  return { failed, dashboard: cfg.dashboard.enabled };
+  return { failed, dashboard: cfg.dashboard.enabled, host: cfg.dashboard.host, project: cfg.dashboard.project };
 }
 
 // src/index.ts
@@ -9944,6 +9954,8 @@ async function main() {
     log: (line) => console.log(line)
   });
   if (env.GITHUB_OUTPUT) (0, import_node_fs2.appendFileSync)(env.GITHUB_OUTPUT, `dashboard=${result.dashboard}
+host=${result.host}
+project=${result.project}
 `);
   if (result.failed) process.exitCode = 1;
 }

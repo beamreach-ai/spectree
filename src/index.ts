@@ -27,7 +27,7 @@ async function main() {
     now: new Date().toISOString(),
     log: (line) => console.log(line),
   });
-  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `dashboard=${result.dashboard}\n`);
+  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `dashboard=${result.dashboard}\nhost=${result.host}\nproject=${result.project}\n`);
   if (result.failed) process.exitCode = 1;
 }
 

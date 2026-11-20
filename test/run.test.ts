@@ -86,7 +86,7 @@ test("sweep: vote, approval record, code phase, a second sweep writes nothing, d
     run({ gh, workspace: dir, defaultBranch: "main", bot: "github-actions[bot]", siteDir: site, serverUrl: "https://github.com", now, log: () => {} });
 
   // Proposed: the vote is open.
-  assert.deepEqual(await sweep(), { failed: 0, dashboard: true });
+  assert.deepEqual(await sweep(), { failed: 0, dashboard: true, host: "github-pages", project: "" });
   assert.equal(status(state, "h1", "spectree/spec"), "pending");
   assert.equal(status(state, "x1", "spectree/spec"), "failure", "code with no spec");
   assert.match(state.comments.get(7)![0].body, /Spec vote: open/);
@@ -132,6 +132,15 @@ test("sweep: vote, approval record, code phase, a second sweep writes nothing, d
   assert.doesNotMatch(state.comments.get(7)![0].body, /spectree-record/);
 });
 
+test("sweep: with dashboard.host cloudflare the run reports the host and the project", async () => {
+  const dir = workspace({ ".spectree.yml": "dashboard: {host: cloudflare, project: acme-roadmap}\n", "roadmap/search/spec.md": GROUP });
+  const site = join(dir, "_site");
+  const { gh } = fakeGitHub([]);
+  const r = await run({ gh, workspace: dir, defaultBranch: "main", bot: "github-actions[bot]", siteDir: site, serverUrl: "https://github.com", now: "2026-11-20T12:00:00.000Z", log: () => {} });
+  assert.deepEqual(r, { failed: 0, dashboard: true, host: "cloudflare", project: "acme-roadmap" });
+  assert.ok(readFileSync(join(site, "index.html"), "utf8").includes("Search"));
+});
+
 test("sweep: on_missing_spec close, and a record in a stranger's comment is not trusted", async () => {
   const dir = workspace({ ".spectree.yml": "on_missing_spec: close\n", "roadmap/search/spec.md": GROUP });
   const stray: any = { number: 8, title: "Quick hack", user: { login: "outsider" }, head: { sha: "x1" }, body: "", labels: [], html_url: "u8", files: [{ filename: "src/main.py", status: "modified", sha: "m" }] };
@@ -155,6 +164,8 @@ test("cli: init writes the two workflow files once; validate reports problems", 
     assert.equal(cli(["init"], dir), 0);
     assert.equal(readFileSync(join(dir, ".github/workflows/spectree.yml"), "utf8"), workflow("main"));
     assert.equal(readFileSync(join(dir, ".github/workflows/spectree-signal.yml"), "utf8"), signal);
+    const passed = [...workflow("main").matchAll(/\$\{\{ secrets\.(\w+) \}\}/g)].map((m) => m[1]);
+    assert.deepEqual(passed, ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"], "init passes the Cloudflare secrets and no other");
     assert.equal(cli(["init"], dir), 0);
     assert.ok(out.some((l) => /kept/.test(l)));
     assert.equal(cli(["validate"], dir), 0);

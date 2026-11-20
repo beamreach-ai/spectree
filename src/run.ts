@@ -85,7 +85,7 @@ export interface RunOptions {
 }
 
 /** One sweep: every open pull request against the default branch is evaluated and updated, then the dashboard is built. */
-export async function run(o: RunOptions): Promise<{ failed: number; dashboard: boolean }> {
+export async function run(o: RunOptions): Promise<{ failed: number; dashboard: boolean; host: string; project: string }> {
   const cfgFile = join(o.workspace, CONFIG_FILE);
   const { config: cfg, errors: cfgErrors } = loadConfig(existsSync(cfgFile) ? readFileSync(cfgFile, "utf8") : null);
   for (const e of cfgErrors) o.log(`::warning file=${CONFIG_FILE}::${e}`);
@@ -172,5 +172,5 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
     writeFileSync(join(dir, "roadmap.json"), JSON.stringify(data, null, 2) + "\n");
     o.log(`dashboard: ${Object.keys(main.specs).length} specs in ${o.defaultBranch}, ${data.proposals.length} open proposals`);
   }
-  return { failed, dashboard: cfg.dashboard.enabled };
+  return { failed, dashboard: cfg.dashboard.enabled, host: cfg.dashboard.host, project: cfg.dashboard.project };
 }

@@ -7378,7 +7378,7 @@ var DEFAULTS = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
-  dashboard: { enabled: true, path: "" }
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "" }
 };
 function loadConfig(text) {
   const errors = [];
@@ -7436,6 +7436,16 @@ function loadConfig(text) {
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          if (d.host !== void 0) {
+            if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
+            else errors.push("dashboard.host must be github-pages or cloudflare");
+          }
+          if (d.project !== void 0) {
+            if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;
+            else errors.push("dashboard.project must be a Cloudflare Pages project name: lowercase letters, digits and dashes");
+          }
+          if (config.dashboard.host === "cloudflare" && !config.dashboard.project) errors.push("dashboard.host cloudflare needs dashboard.project, the Cloudflare Pages project");
         } else errors.push("dashboard must be a mapping");
         break;
       }
@@ -7714,6 +7724,10 @@ permissions:
 jobs:
   spectree:
     uses: ${SOURCE}/.github/workflows/spectree.yml@${VERSION}
+    # Used only with dashboard.host: cloudflare in .spectree.yml. No other secret is passed.
+    secrets:
+      CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 `;
 var signal = `name: Spectree signal
 # A review on a pull request from a fork cannot write the vote count.
