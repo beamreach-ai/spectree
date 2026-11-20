@@ -18,6 +18,10 @@ inputs:
 outputs:
   dashboard:
     description: true when the dashboard was built.
+  host:
+    description: Where the dashboard is published, github-pages or cloudflare.
+  project:
+    description: The Cloudflare Pages project, when host is cloudflare.
 runs:
   using: node24
   main: dist/index.cjs

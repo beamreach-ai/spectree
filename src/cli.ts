@@ -33,6 +33,10 @@ permissions:
 jobs:
   spectree:
     uses: ${SOURCE}/.github/workflows/spectree.yml@${VERSION}
+    # Used only with dashboard.host: cloudflare in .spectree.yml. No other secret is passed.
+    secrets:
+      CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 `;
 
 export const signal = `name: Spectree signal

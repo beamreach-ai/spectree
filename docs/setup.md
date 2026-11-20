@@ -31,6 +31,35 @@ If you skip this step, the checks and the vote count still work. Only the page i
 
 If the repository already publishes a site with GitHub Pages, spectree's page would replace it. Set `dashboard.enabled: false` until spectree can publish under a path of an existing site.
 
+### A private repository: Cloudflare Pages behind a GitHub login
+
+A GitHub Pages site from a private repository is public, unless the owner is on GitHub Enterprise Cloud. Publish the page to Cloudflare Pages instead, and put Cloudflare Access in front of it.
+
+1. In Cloudflare, create an API token with the permission **Account → Cloudflare Pages → Edit**. Add two repository secrets: `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` (on the right of the account's overview page).
+2. Check that `.github/workflows/spectree.yml` passes them. `init` writes this; add it by hand to a file from an older `init`:
+
+   ```yaml
+   jobs:
+     spectree:
+       uses: beamreach-ai/spectree/.github/workflows/spectree.yml@v1
+       secrets:
+         CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+         CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+   ```
+
+3. In `.spectree.yml`:
+
+   ```yaml
+   dashboard:
+     host: cloudflare
+     project: acme-roadmap   # lowercase letters, digits and dashes
+   ```
+
+   The next run creates the project and publishes the page at `https://acme-roadmap.pages.dev`. Leave GitHub Pages off.
+4. Make it private. In Cloudflare Zero Trust, add GitHub under **Settings → Authentication → Login methods**. Then add an application under **Access → Applications**: type **Self-hosted**, domain `acme-roadmap.pages.dev`, and a policy that allows the people who may see it, for example an **Include** rule on **GitHub organization** `acme`, or on their emails. Add a second application with the domain `*.acme-roadmap.pages.dev`, so that each deploy's own preview address is covered as well. Until this step is done, the page is public.
+
+The deploy runs in a job of its own, which receives the two Cloudflare secrets and nothing else. A failed deploy is reported in the run and does not fail the checks.
+
 ## 3. Change the defaults (optional)
 
 Add `.spectree.yml` to the root of the repository. Every key is optional, and these are the defaults:
@@ -49,6 +78,8 @@ on_missing_spec: fail             # fail, close the pull request as well, or all
 dashboard:
   enabled: true
   path: ""                        # publish the page under this path
+  host: github-pages              # or cloudflare, for a private repository (see section 2)
+  project: ""                     # with host cloudflare: the Cloudflare Pages project
 ```
 
 The settings are read from the default branch. A pull request cannot change them for itself.

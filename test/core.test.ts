@@ -48,6 +48,19 @@ test("config: defaults, overrides and errors", () => {
   assert.match(loadConfig("implementation: anyone").errors[0], /contributors or maintainers/);
 });
 
+test("config: the page goes to GitHub Pages unless dashboard.host says cloudflare, which needs a project", () => {
+  assert.equal(DEFAULTS.dashboard.host, "github-pages");
+  assert.equal(loadConfig("dashboard: {enabled: true}").config.dashboard.host, "github-pages");
+  const cf = loadConfig("dashboard: {host: cloudflare, project: acme-roadmap}");
+  assert.deepEqual(cf.errors, []);
+  assert.equal(cf.config.dashboard.host, "cloudflare");
+  assert.equal(cf.config.dashboard.project, "acme-roadmap");
+  assert.match(loadConfig("dashboard: {host: cloudflare}").errors[0], /needs dashboard.project/);
+  assert.match(loadConfig("dashboard: {host: netlify}").errors[0], /github-pages or cloudflare/);
+  assert.match(loadConfig("dashboard: {host: cloudflare, project: Acme_Roadmap}").errors[0], /lowercase/);
+  assert.match(loadConfig("dashboard: {hots: cloudflare}").errors[0], /unknown key: dashboard.hots/);
+});
+
 test("tree: a leaf needs paths and criteria with tests; a group needs neither", () => {
   assert.equal(parseSpec("a", LEAF).spec!.kind, "leaf");
   assert.equal(parseSpec("a", GROUP).spec!.kind, "group");

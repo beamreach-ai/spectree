@@ -11,7 +11,7 @@ export interface Config {
   exempt_paths: string[];
   exempt_authors: string[];
   on_missing_spec: "fail" | "close" | "allow";
-  dashboard: { enabled: boolean; path: string };
+  dashboard: { enabled: boolean; path: string; host: "github-pages" | "cloudflare"; project: string };
 }
 
 export const DEFAULTS: Config = {
@@ -25,7 +25,7 @@ export const DEFAULTS: Config = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
-  dashboard: { enabled: true, path: "" },
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "" },
 };
 
 /** Reads `.roadmap.yml` text. Unknown keys and wrong types are reported, never guessed. */
@@ -85,6 +85,16 @@ export function loadConfig(text: string | null): { config: Config; errors: strin
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          if (d.host !== undefined) {
+            if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
+            else errors.push("dashboard.host must be github-pages or cloudflare");
+          }
+          if (d.project !== undefined) {
+            if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;
+            else errors.push("dashboard.project must be a Cloudflare Pages project name: lowercase letters, digits and dashes");
+          }
+          if (config.dashboard.host === "cloudflare" && !config.dashboard.project) errors.push("dashboard.host cloudflare needs dashboard.project, the Cloudflare Pages project");
         } else errors.push("dashboard must be a mapping");
         break;
       }
