@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { badgeOf } from "./badge.ts";
 import { type Config, loadConfig } from "./config.ts";
 import { type PrSummary, buildData, renderHtml } from "./dashboard.ts";
 import { type ApprovalRecord, type PrInput, type PrResult, LABEL_APPROVED, evaluatePr, implementsRef } from "./evaluate.ts";
@@ -170,6 +171,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "index.html"), renderHtml(data, cfg, o.serverUrl));
     writeFileSync(join(dir, "roadmap.json"), JSON.stringify(data, null, 2) + "\n");
+    writeFileSync(join(dir, "badge.json"), JSON.stringify(badgeOf(data)) + "\n");
     o.log(`dashboard: ${Object.keys(main.specs).length} specs in ${o.defaultBranch}, ${data.proposals.length} open proposals`);
   }
   return { failed, dashboard: cfg.dashboard.enabled, host: cfg.dashboard.host, project: cfg.dashboard.project };
