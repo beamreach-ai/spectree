@@ -1,7 +1,7 @@
 import picomatch from "picomatch";
 import type { Config } from "./config.ts";
 import { type ChangedFile, type Review, type Tally, specDigest, tally } from "./tally.ts";
-import { type Spec, isSpecFile, missingAncestors, nodeIdOf, parseSpec } from "./tree.ts";
+import { type Criterion, type Spec, isSpecFile, missingAncestors, nodeIdOf, parseSpec } from "./tree.ts";
 
 export const LABEL_APPROVED = "spec-approved";
 export const LABEL_NO_SPEC = "no-spec";
@@ -54,6 +54,9 @@ export interface NodeChange {
   change: "added" | "changed" | "removed";
   /** The horizon of a planned leaf; null when the leaf is to be built now. */
   planned: string | null;
+  /** The criteria and body of the spec: as proposed, or as it was for a removed node. */
+  criteria: Criterion[];
+  body: string;
 }
 
 export interface PrResult {
@@ -133,7 +136,7 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
     const id = nodeIdOf(cfg.root, f.path)!;
     const before = input.baseSpecs[id];
     if (f.status === "removed") {
-      if (before) nodes.push({ id, title: before.title, kind: before.kind, change: "removed", planned: before.planned });
+      if (before) nodes.push({ id, title: before.title, kind: before.kind, change: "removed", planned: before.planned, criteria: before.criteria, body: before.body });
       continue;
     }
     const content = input.specContents[f.path];
@@ -145,7 +148,8 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
     errors.push(...parsed.errors);
     if (parsed.spec) {
       headSpecs[id] = parsed.spec;
-      nodes.push({ id, title: parsed.spec.title, kind: parsed.spec.kind, change: before ? "changed" : "added", planned: parsed.spec.planned });
+      const { title, kind, planned, criteria, body } = parsed.spec;
+      nodes.push({ id, title, kind, change: before ? "changed" : "added", planned, criteria, body });
     }
   }
   const removed = new Set(nodes.filter((n) => n.change === "removed").map((n) => n.id));
