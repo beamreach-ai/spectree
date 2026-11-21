@@ -29,6 +29,12 @@ In the repository settings, open **Pages** and choose **GitHub Actions** as the 
 
 If you skip this step, the checks and the vote count still work. Only the page is missing.
 
+To point visitors at the page, add a badge to the top of your README. It shows how many specs are done, how many proposals are open, and how many are waiting for votes:
+
+```markdown
+[![roadmap](https://img.shields.io/endpoint?url=https://<owner>.github.io/<repo>/badge.json)](https://<owner>.github.io/<repo>/)
+```
+
 If the repository already publishes a site with GitHub Pages, spectree's page would replace it. Set `dashboard.enabled: false` until spectree can publish under a path of an existing site.
 
 ### A private repository: Cloudflare Pages behind a GitHub login
