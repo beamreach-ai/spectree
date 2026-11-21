@@ -46,6 +46,10 @@ test("config: defaults, overrides and errors", () => {
   assert.deepEqual(errors, []);
   assert.match(loadConfig("treshold: 2").errors[0], /unknown key: treshold/);
   assert.match(loadConfig("implementation: anyone").errors[0], /contributors or maintainers/);
+  assert.deepEqual(loadConfig("").config, DEFAULTS);
+  assert.equal(loadConfig("threshold: two").config.threshold, DEFAULTS.threshold, "a wrong value keeps the default");
+  assert.match(loadConfig("threshold: [1").errors[0], /^\.spectree\.yml is not valid YAML/);
+  assert.match(loadConfig("- a list").errors[0], /^\.spectree\.yml must be a mapping/);
 });
 
 test("config: the page goes to GitHub Pages unless dashboard.host says cloudflare, which needs a project", () => {

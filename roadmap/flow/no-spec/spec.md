@@ -14,6 +14,11 @@ criteria:
   - id: close
     text: "With on_missing_spec set to close, the pull request is also closed."
     tests: [test/run.test.ts]
+  - id: allow
+    text: "With on_missing_spec set to allow, code with no spec passes the spec check and gets no comment."
+    tests: [test/core.test.ts]
 ---
 
 Small fixes do not need a vote: docs, workflow files, dependency bots, and anything a maintainer labels `no-spec`.
+
+A project that is trying spectree out sets `on_missing_spec: allow`: spec pull requests go through the vote, and other pull requests are not held up.

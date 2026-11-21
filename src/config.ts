@@ -28,7 +28,7 @@ export const DEFAULTS: Config = {
   dashboard: { enabled: true, path: "", host: "github-pages", project: "" },
 };
 
-/** Reads `.roadmap.yml` text. Unknown keys and wrong types are reported, never guessed. */
+/** Reads `.spectree.yml` text. Unknown keys and wrong types are reported, never guessed. */
 export function loadConfig(text: string | null): { config: Config; errors: string[] } {
   const errors: string[] = [];
   const config: Config = structuredClone(DEFAULTS);
@@ -37,10 +37,10 @@ export function loadConfig(text: string | null): { config: Config; errors: strin
   try {
     raw = parse(text);
   } catch (e) {
-    return { config, errors: [`.roadmap.yml is not valid YAML: ${(e as Error).message}`] };
+    return { config, errors: [`.spectree.yml is not valid YAML: ${(e as Error).message}`] };
   }
   if (raw === null || raw === undefined) return { config, errors };
-  if (typeof raw !== "object" || Array.isArray(raw)) return { config, errors: [".roadmap.yml must be a mapping"] };
+  if (typeof raw !== "object" || Array.isArray(raw)) return { config, errors: [".spectree.yml must be a mapping"] };
   const r = raw as Record<string, unknown>;
   const strList = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === "string");
   for (const [key, value] of Object.entries(r)) {
