@@ -9264,10 +9264,10 @@ function loadConfig(text) {
   try {
     raw = (0, import_yaml.parse)(text);
   } catch (e) {
-    return { config, errors: [`.roadmap.yml is not valid YAML: ${e.message}`] };
+    return { config, errors: [`.spectree.yml is not valid YAML: ${e.message}`] };
   }
   if (raw === null || raw === void 0) return { config, errors };
-  if (typeof raw !== "object" || Array.isArray(raw)) return { config, errors: [".roadmap.yml must be a mapping"] };
+  if (typeof raw !== "object" || Array.isArray(raw)) return { config, errors: [".spectree.yml must be a mapping"] };
   const r = raw;
   const strList2 = (v) => Array.isArray(v) && v.every((x) => typeof x === "string");
   for (const [key, value] of Object.entries(r)) {
