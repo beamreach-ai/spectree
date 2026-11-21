@@ -17,7 +17,7 @@ export function badgeOf(data: DashData): Badge {
   };
   data.tree.forEach(walk);
   const open = data.proposals.length;
-  const voting = data.proposals.filter((p) => p.phase === "spec").length;
+  const voting = data.proposals.filter((p) => p.next === "votes").length;
   const parts = [`${done} done`, `${open} open`];
   if (voting) parts.push(`${voting} ${voting === 1 ? "needs" : "need"} votes`);
   return { schemaVersion: 1, label: "roadmap", message: parts.join(" · "), color: voting ? "blueviolet" : "brightgreen" };

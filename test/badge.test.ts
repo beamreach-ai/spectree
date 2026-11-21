@@ -10,13 +10,15 @@ import { run } from "../src/run.ts";
 
 const node = (id: string, status: DashNode["status"], kind: DashNode["kind"] = "leaf", children: DashNode[] = []): DashNode => ({
   id, name: id, title: id, kind, level: "epic", status, horizon: "", open: [],
-  counts: { done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 0 }, children,
+  counts: { done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 0 }, summary: "", criteria: [], children,
 });
-const proposal = (number: number, phase: DashPr["phase"]): DashPr => ({
-  number, title: "", author: "", url: "", phase, status: "proposed", valid: true, for: 0, against: 0, forPeople: 0, againstPeople: 0, nodes: [],
+const NEXT = { spec: "votes", approved: "code", code: "review" } as const;
+const proposal = (number: number, phase: "spec" | "approved" | "code", next: DashPr["next"] = NEXT[phase]): DashPr => ({
+  number, title: "", author: "", url: "", phase, status: "proposed", valid: next !== "fix", for: 0, against: 0, forPeople: 0, againstPeople: 0,
+  next, votes: [], nodes: [],
 });
 const data = (proposals: DashPr[]): DashData => ({
-  repository: "acme/engine", generated: "", threshold: 1, levels: ["epic"], proposals,
+  repository: "acme/engine", generated: "", threshold: 1, max_against: 0, levels: ["epic"], proposals,
   tree: [node("search", "done", "group", [node("search/full", "done"), node("search/fast", "in_progress")]), node("ranking", "planned"), node("docs", "done")],
 });
 
@@ -31,6 +33,7 @@ test("badge: a proposal waiting for votes is named and changes the colour", () =
   assert.equal(one.message, "2 done · 2 open · 1 needs votes");
   assert.equal(one.color, "blueviolet");
   assert.equal(badgeOf(data([proposal(3, "spec"), proposal(5, "spec")])).message, "2 done · 2 open · 2 need votes");
+  assert.equal(badgeOf(data([proposal(3, "spec", "fix")])).color, "brightgreen", "a spec that is not valid waits for a fix, not for votes");
 });
 
 test("badge: the sweep publishes badge.json beside the page", async () => {
