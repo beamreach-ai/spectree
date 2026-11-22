@@ -1960,7 +1960,7 @@ ${indent}${line}` : "\n";
           str += ",";
         } else if (ctx.options.trailingComma) {
           if (ctx.options.lineWidth > 0) {
-            reqNewline || (reqNewline = lines.reduce((sum, line) => sum + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
+            reqNewline || (reqNewline = lines.reduce((sum2, line) => sum2 + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
           }
           if (reqNewline) {
             str += ",";
@@ -1976,7 +1976,7 @@ ${indent}${line}` : "\n";
         return start + end;
       } else {
         if (!reqNewline) {
-          const len = lines.reduce((sum, line) => sum + line.length + 2, 2);
+          const len = lines.reduce((sum2, line) => sum2 + line.length + 2, 2);
           reqNewline = ctx.options.lineWidth > 0 && len > ctx.options.lineWidth;
         }
         if (reqNewline) {
@@ -7544,6 +7544,28 @@ function nextOf(r) {
 }
 var statusOf = (phase) => phase === "code" ? "in_progress" : phase === "approved" ? "approved" : "proposed";
 var zero = () => ({ done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 0 });
+var FIRST_HORIZONS = ["now", "next", "later"];
+var sum = (c) => Object.values(c).reduce((a, b) => a + b, 0);
+function overviewOf(roots) {
+  const all = { id: "", title: "All", total: 0, counts: zero(), horizons: {} };
+  const rows = roots.map((root) => {
+    const horizons2 = {};
+    const walk = (n) => {
+      if (n.kind === "leaf" && n.status === "planned") horizons2[n.horizon] = (horizons2[n.horizon] ?? 0) + 1;
+      n.children.forEach(walk);
+    };
+    walk(root);
+    for (const s of ORDER) all.counts[s] += root.counts[s];
+    for (const [h, v] of Object.entries(horizons2)) all.horizons[h] = (all.horizons[h] ?? 0) + v;
+    return { id: root.id, title: root.title, total: sum(root.counts), counts: { ...root.counts }, horizons: horizons2 };
+  });
+  all.total = sum(all.counts);
+  const rank = (h) => h === "" ? 2 : FIRST_HORIZONS.includes(h) ? 0 : 1;
+  const horizons = Object.keys(all.horizons).sort(
+    (a, b) => rank(a) - rank(b) || (rank(a) === 0 ? FIRST_HORIZONS.indexOf(a) - FIRST_HORIZONS.indexOf(b) : a < b ? -1 : a > b ? 1 : 0)
+  );
+  return { horizons, rows, all };
+}
 function buildData(mainSpecs, prs, cfg, repository, now) {
   const flat = /* @__PURE__ */ new Map();
   const make = (id, title, kind, status, body, criteria, horizon = "") => ({
@@ -7607,7 +7629,7 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     return n.counts;
   };
   roots.forEach(roll);
-  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, proposals, tree: roots };
+  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, proposals, overview: overviewOf(roots), tree: roots };
 }
 var esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 var inline = (s) => esc(s).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -7615,6 +7637,23 @@ var LABEL = { done: "Done", planned: "Planned", in_progress: "In progress", appr
 var ORDER = ["done", "in_progress", "approved", "proposed", "planned"];
 var pill = (s, text = LABEL[s]) => `<span class="pill ${s}">${esc(text)}</span>`;
 var plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+var STAGES = ["in_progress", "approved", "proposed"];
+function renderOverview(o, first) {
+  if (!o.rows.length) return "";
+  const num = (n) => `<td class="num">${n || ""}</td>`;
+  const row = (r) => {
+    const pct = r.total ? Math.round(r.counts.done / r.total * 100) : 0;
+    const name = r.id ? `<a href="#spec-${esc(r.id)}">${esc(r.title)}</a>` : esc(r.title);
+    return `<tr${r.id ? "" : ' class="all"'}><th scope="row">${name}</th><td class="progress"><span class="bar"><span style="width:${pct}%"></span></span> ${r.counts.done} of ${r.total} done</td>${STAGES.map(
+      (s) => num(r.counts[s])
+    ).join("")}${o.horizons.map((h) => num(r.horizons[h] ?? 0)).join("")}</tr>`;
+  };
+  const stages = STAGES.map((s) => `<th class="num stage"${o.horizons.length ? ' rowspan="2"' : ""}>${LABEL[s]}</th>`).join("");
+  const span = o.horizons.length ? ' rowspan="2"' : "";
+  const planned = o.horizons.length ? `<th class="num group" colspan="${o.horizons.length}">Planned</th></tr><tr>${o.horizons.map((h) => `<th class="num">${esc(h || "no horizon")}</th>`).join("")}` : "";
+  return `<h2>Overview</h2>
+<div class="box"><table class="overview"><thead><tr><th${span}>${esc(first)}</th><th${span}>Progress</th>${stages}${planned}</tr></thead><tbody>${o.rows.map(row).join("")}${row(o.all)}</tbody></table></div>`;
+}
 var NEXT = {
   fix: "A fix to the spec",
   votes: "Votes",
@@ -7638,8 +7677,8 @@ function renderNode(n, repoUrl, root) {
   const head = `<span class="level">${esc(n.level)}</span> <a class="title" href="${href}">${esc(n.title)}</a> <code>${esc(n.name)}</code> ${n.kind === "leaf" ? pill(n.status, n.status === "planned" && n.horizon ? `Planned: ${n.horizon}` : LABEL[n.status]) : counts || pill(n.status)} ${inMain || n.kind === "group" ? open : ""} ${many}`;
   const detail = renderDetail(n);
   const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root)).join("")}</ul>` : "";
-  if (!detail && !kids) return `<li class="node"><div class="row plain">${head}</div></li>`;
-  return `<li class="node"><details${kids ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
+  if (!detail && !kids) return `<li class="node" id="spec-${esc(n.id)}"><div class="row plain">${head}</div></li>`;
+  return `<li class="node" id="spec-${esc(n.id)}"><details${kids ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
 }
 function renderVotes(p, threshold) {
   const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
@@ -7661,12 +7700,7 @@ function renderNext(p) {
 function renderHtml(data, cfg, serverUrl = "https://github.com") {
   const repoUrl = `${serverUrl}/${data.repository}`;
   const name = data.repository.split("/").pop();
-  const total = zero();
-  const walk = (n) => {
-    if (n.kind === "leaf") total[n.status]++;
-    n.children.forEach(walk);
-  };
-  data.tree.forEach(walk);
+  const first = data.levels[0] ? data.levels[0][0].toUpperCase() + data.levels[0].slice(1) : "Spec";
   const proposals = data.proposals.length ? `<table><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead><tbody>${data.proposals.map(
     (p) => `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}</div><div>${p.nodes.map((n) => `<code>${esc(n)}</code>`).join(" ")}</div></td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
       p,
@@ -7700,7 +7734,6 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .muted{color:var(--muted);font-size:14px}
 .intro{max-width:720px;margin:12px 0 0}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
-.summary{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .pill.done{color:var(--done);background:var(--done-bg)}.pill.in_progress{color:var(--prog);background:var(--prog-bg)}
 .pill.approved{color:var(--appr);background:var(--appr-bg)}.pill.proposed{color:var(--prop);background:var(--prop-bg)}
@@ -7711,6 +7744,14 @@ table{border-collapse:collapse;width:100%;min-width:640px}
 th,td{text-align:left;padding:10px 12px 10px 0;border-bottom:1px solid var(--line);vertical-align:top;font-size:15px}
 th{font-size:13px;color:var(--muted);font-weight:600}tr:last-child td{border-bottom:0}
 td:first-child{width:38%}td:last-child{width:32%}
+.overview{min-width:560px}.overview th,.overview td,.overview td:last-child{width:auto;padding-right:16px;vertical-align:middle}
+.overview tbody th{font-size:15px;color:var(--fg);border-bottom:1px solid var(--line)}
+.overview .num{text-align:right;font-variant-numeric:tabular-nums}.overview .group{text-align:center;border-bottom:0;padding-bottom:0}
+.overview .progress{white-space:nowrap;color:var(--muted);font-size:14px;width:1%}.overview .stage{white-space:nowrap;width:1%}
+.overview .all th,.overview .all td{font-weight:600;border-bottom:0}
+.bar{display:inline-block;width:96px;height:8px;margin-right:8px;border-radius:4px;background:var(--line);overflow:hidden;vertical-align:middle}
+.bar span{display:block;height:100%;background:var(--done)}
+.node{scroll-margin-top:12px}
 .next{font-weight:600}
 ul{list-style:none;margin:0;padding:0}
 .tree ul{margin-left:4px;padding-left:16px;border-left:1px solid var(--line)}
@@ -7726,8 +7767,8 @@ details[open]>summary.row::before{transform:rotate(90deg)}
 .detail p{margin:6px 0}
 .criteria{margin:6px 0;padding-left:20px}.criteria li{margin:4px 0}.criteria .muted{display:block;font-size:13px}
 footer{margin-top:40px}
-@media (max-width:640px){table,tbody,tr,td{display:block}thead{display:none}table{min-width:0}
-td,td:first-child,td:last-child{width:auto;padding:3px 0;border:0}tr{padding:10px 0;border-bottom:1px solid var(--line)}tr:last-child{border-bottom:0}}
+@media (max-width:640px){table:not(.overview),table:not(.overview) tbody,table:not(.overview) tr,table:not(.overview) td{display:block}table:not(.overview) thead{display:none}table:not(.overview){min-width:0}
+table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) tr{padding:10px 0;border-bottom:1px solid var(--line)}table:not(.overview) tr:last-child{border-bottom:0}}
 </style>
 </head>
 <body>
@@ -7735,7 +7776,7 @@ td,td:first-child,td:last-child{width:auto;padding:3px 0;border:0}tr{padding:10p
 <h1>${esc(name)} roadmap</h1>
 <div class="muted"><a href="${repoUrl}">${esc(data.repository)}</a></div>
 <p class="intro">${intro}</p>
-<div class="summary">${ORDER.map((s) => pill(s, `${total[s]} ${LABEL[s].toLowerCase()}`)).join("")}</div>
+${renderOverview(data.overview, first)}
 <h2>Open proposals</h2>
 <div class="box">${proposals}</div>
 <h2>Specs</h2>
