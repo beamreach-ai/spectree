@@ -77,7 +77,7 @@ The numbers in this example are made up.
   `horizons` lists the columns in display order. `roadmap.json` carries the object as it is.
 - `renderHtml` renders the table from `data.overview` and nothing else. Its own walk over the tree for the pill totals goes away with the pills.
 - `renderNode` gives each node's `<li>` the attribute `id="spec-<node id>"`, which the first column links to.
-- The tests are in a new file, `test/overview.test.ts`. The existing tests of the page keep passing, apart from the one that expects the pills.
+- The tests are in a new file, `test/overview.test.ts`. The existing tests in `test/dashboard.test.ts` keep passing unchanged; none of them reads the pills.
 
 ## Not in this spec
 
