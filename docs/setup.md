@@ -144,7 +144,7 @@ A pull request needs no spec when:
 
 ## Updating
 
-The workflow file points at the `v1` tag, which moves forward with compatible releases. Nothing to do.
+The workflow file points at the `v1` tag. The tag moves by itself to every commit on spectree's main branch that passes its tests, so a change to the checks or to the roadmap page reaches your repository with its next run. Nothing to do.
 
 ## Removing
 
