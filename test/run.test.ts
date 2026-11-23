@@ -113,6 +113,9 @@ test("sweep: vote, approval record, code phase, a second sweep writes nothing, d
   pull.trees.h2 = "t1";
   pull.files = [...pull.files, { filename: "src/index/inc.py", status: "added", sha: "c1" }, { filename: "tests/index/test_incremental.py", status: "added", sha: "c2" }];
   await sweep("2026-11-17T15:00:00.000Z");
+  assert.deepEqual(["spec", "phase", "scope"].map((c) => status(state, "h2", `spectree/${c}`)), ["success", "pending", "success"], "the code waits for its own approval");
+  pull.reviews = [...pull.reviews, { user: { login: "maint" }, state: "APPROVED", commit_id: "h2", submitted_at: "2026-11-17T15:30:00Z" }];
+  await sweep("2026-11-17T15:40:00.000Z");
   assert.deepEqual(["spec", "phase", "scope"].map((c) => status(state, "h2", `spectree/${c}`)), ["success", "success", "success"]);
   data = JSON.parse(readFileSync(join(site, "roadmap.json"), "utf8"));
   assert.equal(data.tree[0].children[0].status, "in_progress");

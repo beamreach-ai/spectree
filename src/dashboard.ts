@@ -74,6 +74,8 @@ export interface DashPr {
   stale: boolean;
   /** Who said they will write the code; empty when nobody did. */
   taken_by: string;
+  /** The code review; null outside the code phase and when the project has none. */
+  review: { for: number; against: number; needed: number; passed: boolean } | null;
 }
 
 /** One line of the overview: a top-level node, or the whole roadmap. */
@@ -196,7 +198,7 @@ export function summaryOf(body: string, max = 360): string {
 function nextOf(r: PrResult): NextStep {
   if (r.errors.length) return "fix";
   if (r.phase === "spec") return "votes";
-  if (r.phase === "code") return "review";
+  if (r.phase === "code") return r.review?.passed && r.statuses.phase.state === "success" && r.statuses.scope.state === "success" ? "merge" : "review";
   return r.statuses.phase.state === "pending" ? "code" : "merge";
 }
 
@@ -282,6 +284,7 @@ export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg
       for: r.tally?.for ?? 0, against: r.tally?.against ?? 0, forPeople: r.tally?.forPeople ?? 0, againstPeople: r.tally?.againstPeople ?? 0,
       next, votes: (r.tally?.votes ?? []).map(({ user, vote, weight }) => ({ user, vote, weight })),
       nodes: r.nodes.map((n) => n.id),
+      review: r.review ? { for: r.review.for, against: r.review.against, needed: cfg.review.threshold, passed: r.review.passed } : null,
     });
     for (const n of r.nodes) {
       // A planned leaf takes no code: once its vote passes it is planned, never in progress.
@@ -545,11 +548,12 @@ function renderVotes(p: DashPr, threshold: number): string {
       .map((x) => `@${esc(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`)
       .join(", ");
   // Once the vote has passed with nobody but the author voting, the numbers say nothing.
-  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return "<div>Approved</div>";
-  const lines = [`<div>${p.for} of ${threshold} for, ${p.against} against</div>`];
+  const code = p.review ? `<div>Code: ${p.review.for} of ${p.review.needed} for, ${p.review.against} against</div>` : "";
+  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return `<div>${code ? "Spec approved" : "Approved"}</div>${code}`;
+  const lines = [`<div>${code ? "Spec: " : ""}${p.for} of ${threshold} for, ${p.against} against</div>`];
   if (who("for")) lines.push(`<div class="muted">For: ${who("for")}</div>`);
   if (who("against")) lines.push(`<div class="muted">Against: ${who("against")}</div>`);
-  return lines.join("");
+  return lines.join("") + code;
 }
 
 function renderNext(p: DashPr): string {
@@ -557,7 +561,9 @@ function renderNext(p: DashPr): string {
     fix: "The spec has problems. The vote starts when it is valid.",
     votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
     code: "The spec is approved and frozen. The code goes in this pull request, or in another with <code>Implements: #" + p.number + "</code>.",
-    review: "The code is in. It is reviewed like any other code.",
+    review: p.review
+      ? `<a href="${p.url}/files">Review the code</a>: Approve on the latest commit, or comment <code>/spectree for</code>.`
+      : "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge.",
   };
   return `<div class="next">${NEXT[p.next]}</div><div class="muted">${hint[p.next]}</div>`;

@@ -30,22 +30,34 @@ The vote passes when the weighted votes for reach `threshold` and the weighted v
 When the vote passes, spectree writes a record into its own comment on the pull request: the spec digest, the commit, the time and every vote with its weight.
 
 - **The digest** is a SHA-256 over the sorted list of the spec files the pull request changes, with the Git blob id of each. It depends on content only, so it survives a rebase and a squash.
-- **After approval** the reviews are no longer counted. On each run, spectree computes the digest again. If it equals the recorded one, the approval holds. If not, the record is dropped, the label is removed and the vote starts again.
-- **Taking over** uses the same record: a pull request with `Implements: #n` inherits the approval of #n when its digest equals the one recorded there.
+- **After approval** the reviews are no longer counted as votes on the spec. On each run, spectree computes the digest again. If it equals the recorded one, the approval holds. If not, the record is dropped, the label is removed and the vote starts again.
+- **Taking over** uses the same record: a pull request with `Implements: #n` inherits the approval of #n when its digest equals the one recorded there. It inherits nothing for its code.
 
 A record is trusted only in a comment written by the workflow's own account. A record pasted into a comment by anyone else is ignored.
+
+## The code review
+
+Once the spec is approved and the pull request holds code, the code needs its own approval.
+
+- It is counted like the vote: each person's latest review or command, with the same weights. The author counts at their own weight when `review.count_author` is true.
+- A review counts only if it was made on the head commit. A command counts only if it was written after the workflow first saw the head commit; that time is kept in the workflow's comment.
+- So every push, rebase or merge of the default branch asks for the approval again. Nothing is recorded: the count is made fresh on each run.
+- It passes when the weighted approvals reach `review.threshold` and no vote against has a weight above zero.
+- A review made on a commit that holds both the spec and the code counts for both.
+
+The spec approval is tied to the spec's text and survives every code push. The code approval is tied to the commit. That is why they are two.
 
 ## The checks
 
 | Check | Passes when |
 |---|---|
 | `spectree/spec` | The changed specs are valid and the vote passed. Or the pull request needs no spec |
-| `spectree/phase` | No code before approval. A leaf has code before merge, unless it is planned or every test it names is already in the default branch. In `maintainers` mode, the code's author has write access |
+| `spectree/phase` | No code before approval. A leaf has code before merge, unless it is planned or every test it names is already in the default branch. In `maintainers` mode, the code's author has write access. Code in the pull request has passed its code review |
 | `spectree/scope` | Every changed file outside `roadmap/` matches a path of a leaf in the pull request, and every test file named by a criterion exists |
 
 Exempt files are not counted as code and are not checked against the paths.
 
-`spectree/scope` proves that the change stays inside the declared area and that the named tests exist. It does not judge whether the code meets the criteria. Whether the tests pass is your own CI, and whether they test the right thing is code review.
+`spectree/scope` proves that the change stays inside the declared area and that the named tests exist. It does not judge whether the code meets the criteria. Whether the tests pass is your own CI. Whether they test the right thing is for the code review, which `spectree/phase` waits for.
 
 ## Security model
 

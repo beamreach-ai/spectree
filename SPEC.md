@@ -87,7 +87,7 @@ Why this is needed, what it does, what it does not do.
 1. **Open.** A contributor opens a PR that changes only files under `roadmap/`. This starts the spec phase.
 2. **Vote.** People review the PR. "Approve" is a vote for and "Request changes" is a vote against (section 5).
 3. **Approval.** When the vote passes, the workflow writes an approval record (section 5.4), adds the label `spec-approved` and reports the check `spectree/spec` as passed. The spec files are now frozen.
-4. **Code.** Code is pushed to the same PR. The repository's normal code review applies and this tool does not replace it.
+4. **Code.** Code is pushed to the same PR. It needs its own approval, counted like the vote but only on the PR's head commit, so any push asks for it again. The author counts at their own weight (`review.count_author`), and `review.threshold: 0` turns it off. The result is part of `spectree/phase`. See `roadmap/flow/review/spec.md`.
 5. **Merge.** Spec and code reach `main` in one merge.
 
 Rules the checks enforce (section 6):

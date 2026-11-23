@@ -212,7 +212,7 @@ test("tally: in full while the vote is open or someone else voted; otherwise App
   const vote = (n: number) => new RegExp(`#${n} PR ${n}</a>.*?</td><td>.*?</td><td>(.*?)</td>`, "s").exec(html)![1];
   assert.equal(vote(1), '<div>0 of 1 for, 0 against</div><div class="muted">For: @outsider (weight 0)</div>');
   assert.equal(vote(3), '<div>0 of 1 for, 0 against</div><div class="muted">For: @outsider (weight 0)</div>');
-  assert.equal(vote(6), '<div>1 of 1 for, 0 against</div><div class="muted">For: @maint, @outsider (weight 0)</div>');
+  assert.equal(vote(6), '<div>Spec: 1 of 1 for, 0 against</div><div class="muted">For: @maint, @outsider (weight 0)</div><div>Code: 1 of 1 for, 0 against</div>');
   assert.equal(vote(8), "<div>Approved</div>");
 });
 

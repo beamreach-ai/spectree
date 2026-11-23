@@ -69,7 +69,16 @@ When the vote passes, the pull request gets the label `spec-approved` and the sp
 - Add every test file your criteria name.
 - Do not edit the spec. If the spec turns out to be wrong, change it, and the vote starts again.
 
-From here, reviews are ordinary code review.
+### The code review
+
+The code needs its own approval before the pull request can merge.
+
+- A reviewer approves with **Approve**, or with a comment `/spectree for`. **Request changes** and `/spectree against` are against.
+- It counts only on the latest commit. If you push again, ask for the review again.
+- Weights are the same as in the vote. Your own code counts as approved by you at your own weight, so a maintainer's code passes with nobody else, and yours needs a maintainer when your weight is 0.
+- One vote against with a weight above zero keeps the review open.
+
+The workflow's comment shows the count under the spec vote. A project can turn the code review off or make it stricter; see its `.spectree.yml`.
 
 Some projects set `implementation: maintainers`. There, only maintainers write the code, and your part ends with the approved spec.
 
@@ -87,7 +96,7 @@ If a spec is approved and its author does not write the code, you can:
 2. Add the code.
 3. Open a pull request with this line in the description: `Implements: #123`, where 123 is the approved pull request.
 
-Your pull request inherits the approval, as long as the spec files are identical to the approved ones.
+Your pull request inherits the approval of the spec, as long as the spec files are identical to the approved ones. Its code needs its own review.
 
 ## Changing an existing feature
 
@@ -102,7 +111,7 @@ Documentation and workflow files need no spec. For another small fix, open the p
 | Check | Waiting | Failed |
 |---|---|---|
 | `spectree/spec` | The vote is open | The spec is not valid, or the code has no approved spec |
-| `spectree/phase` | The spec is approved and needs its code | Code arrived before approval |
+| `spectree/phase` | The spec is approved and needs its code, or the code needs its review | Code arrived before approval |
 | `spectree/scope` | | A file is outside the spec's paths, or a test named by a criterion does not exist |
 
 Each check's description says what to do next.

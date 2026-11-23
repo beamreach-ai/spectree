@@ -158,7 +158,8 @@ test("reset: a command counts only if written after the workflow first saw the s
   const vote7 = w.say("maint", "/spectree for", at("12:05"));
   await w.sweep(at("12:06"));
   assert.equal(w.spec().state, "success");
-  const ledger = () => JSON.parse(/<!-- spectree-seen: (.*?) -->/.exec(w.bot()[0].body)![1]);
+  // The ledger also keeps when the head commit was first seen, for the code review; this test reads the spec versions.
+  const ledger = () => Object.fromEntries(Object.entries(JSON.parse(/<!-- spectree-seen: (.*?) -->/.exec(w.bot()[0].body)![1])).filter(([k]) => !k.startsWith("head:")));
   assert.deepEqual(Object.values(ledger()), [at("12:00")], "kept in the workflow's comment, with the workflow's time");
 
   // The author changes the spec, and gives the commit any date they like: it is not read.
