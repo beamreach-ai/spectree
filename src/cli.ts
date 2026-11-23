@@ -45,6 +45,9 @@ export const signal = `name: Spectree signal
 on:
   pull_request_review:
     types: [submitted, edited, dismissed]
+  # A comment can be a command, such as "/spectree for".
+  issue_comment:
+    types: [created, edited]
 
 permissions: {}
 
@@ -52,7 +55,7 @@ jobs:
   signal:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "A review was recorded."
+      - run: echo "A review or a comment was recorded."
 `;
 
 function defaultBranch(dir: string): string {

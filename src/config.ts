@@ -12,7 +12,7 @@ export interface Config {
   exempt_authors: string[];
   on_missing_spec: "fail" | "close" | "allow";
   demand: { enabled: boolean; top: number };
-  dashboard: { enabled: boolean; path: string; host: "github-pages" | "cloudflare"; project: string; collapse_over: number; stale_days: number };
+  dashboard: { enabled: boolean; path: string; host: "github-pages" | "cloudflare"; project: string; collapse_over: number; stale_days: number; recent_days: number };
 }
 
 export const DEFAULTS: Config = {
@@ -27,7 +27,7 @@ export const DEFAULTS: Config = {
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
   demand: { enabled: true, top: 3 },
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30 },
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 },
 };
 
 /** Reads `.spectree.yml` text. Unknown keys and wrong types are reported, never guessed. */
@@ -102,7 +102,7 @@ export function loadConfig(text: string | null): { config: Config; errors: strin
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== undefined) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
@@ -110,6 +110,10 @@ export function loadConfig(text: string | null): { config: Config; errors: strin
           if (d.collapse_over !== undefined) {
             if (typeof d.collapse_over === "number" && Number.isInteger(d.collapse_over) && d.collapse_over >= 0) config.dashboard.collapse_over = d.collapse_over;
             else errors.push("dashboard.collapse_over must be a whole number, 0 or more");
+          }
+          if (d.recent_days !== undefined) {
+            if (typeof d.recent_days === "number" && Number.isInteger(d.recent_days) && d.recent_days >= 0) config.dashboard.recent_days = d.recent_days;
+            else errors.push("dashboard.recent_days must be a whole number, 0 or more");
           }
           if (d.stale_days !== undefined) {
             if (typeof d.stale_days === "number" && Number.isInteger(d.stale_days) && d.stale_days >= 0) config.dashboard.stale_days = d.stale_days;

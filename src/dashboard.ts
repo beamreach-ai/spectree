@@ -72,6 +72,8 @@ export interface DashPr {
   days_in_step: number;
   /** In its step for longer than `dashboard.stale_days`. */
   stale: boolean;
+  /** Who said they will write the code; empty when nobody did. */
+  taken_by: string;
 }
 
 /** One line of the overview: a top-level node, or the whole roadmap. */
@@ -103,6 +105,10 @@ export interface DashData {
   branch: string;
   /** The specs not done that most people want, most wanted first. */
   wanted: { id: string; title: string; up: number }[];
+  /** What changed in the last `dashboard.recent_days`, newest first; null when the run could not tell. */
+  recent: RecentEntry[] | null;
+  /** Specs done in the last 30 and 90 days; null when the run could not tell. */
+  pace: { d30: number; d90: number } | null;
   proposals: DashPr[];
   overview: Overview;
   tree: DashNode[];
@@ -117,6 +123,24 @@ export interface Thread extends Demand {
   number: number;
   url: string;
 }
+export interface Merge {
+  sha: string;
+  at: string;
+  title: string;
+  url: string;
+  /** Ids of the specs the commit added. */
+  added: string[];
+  /** Ids of the planned leaves the commit turned into built ones. */
+  built: string[];
+}
+/** One line of what changed lately. */
+export interface RecentEntry {
+  kind: NodeStatus;
+  at: string;
+  title: string;
+  url: string;
+  ids: string[];
+}
 /** What the page needs beyond the specs and the pull requests. */
 export interface Extra {
   branch?: string;
@@ -124,6 +148,8 @@ export interface Extra {
   threads?: Record<string, Thread>;
   /** Reactions on a pull request's description, by its number. */
   reactions?: Record<number, Demand>;
+  /** Commits on the default branch that added specs or started building planned ones. Absent when not known. */
+  merges?: Merge[];
 }
 /** GitHub's summary of reactions on a post. One person has one of each, so the counts are people. */
 export const demandOf = (reactions: any): Demand => ({ up: Number(reactions?.["+1"] ?? 0), down: Number(reactions?.["-1"] ?? 0) });
@@ -151,6 +177,8 @@ export interface PrSummary {
   url: string;
   /** When the pull request was opened. */
   opened?: string;
+  /** Who said, with `/spectree take`, that they will write the code. */
+  taken?: string;
   result: PrResult;
 }
 
@@ -201,6 +229,33 @@ export function overviewOf(roots: DashNode[]): Overview {
   return { horizons, rows, all };
 }
 
+/** What changed lately, from the commits that reached the default branch and the open proposals. */
+function recentOf(flat: Map<string, DashNode>, proposals: DashPr[], merges: Merge[] | undefined, cfg: Config, now: string): Pick<DashData, "recent" | "pace"> {
+  const window = cfg.dashboard.recent_days;
+  if (!merges || window <= 0) return { recent: null, pace: null };
+  const within = (at: string, days: number) => at !== "" && Date.parse(now) - Date.parse(at) <= days * 86_400_000;
+  const recent: RecentEntry[] = [];
+  const pace = { d30: 0, d90: 0 };
+  for (const m of merges) {
+    // A spec the commit added counts as what it is today: done, or planned and waiting to be built.
+    const now_ = (status: NodeStatus) => m.added.filter((id) => flat.get(id)?.kind === "leaf" && flat.get(id)!.status === status);
+    const done = [...new Set([...now_("done"), ...m.built.filter((id) => flat.get(id)?.status === "done")])];
+    if (within(m.at, 30)) pace.d30 += done.length;
+    if (within(m.at, 90)) pace.d90 += done.length;
+    if (!within(m.at, window)) continue;
+    // One commit is one line, however many specs it brought.
+    for (const [kind, ids] of [["done", done], ["planned", now_("planned")]] as [NodeStatus, string[]][])
+      if (ids.length) recent.push({ kind, at: m.at, title: ids.length === 1 ? flat.get(ids[0])!.title : m.title, url: m.url, ids });
+  }
+  for (const p of proposals) {
+    const past = p.next !== "votes" && p.next !== "fix";
+    const at = past ? p.since : p.opened;
+    if (within(at, window)) recent.push({ kind: past ? "approved" : "proposed", at, title: p.title, url: p.url, ids: p.nodes });
+  }
+  recent.sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || (a.title < b.title ? -1 : 1));
+  return { recent, pace };
+}
+
 /** The roadmap: the default branch's nodes are done; open spec pull requests add the other three statuses. */
 export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg: Config, repository: string, now: string, extra: Extra = {}): DashData {
   const flat = new Map<string, DashNode>();
@@ -222,7 +277,7 @@ export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg
     const daysSince = (t: string) => (t ? Math.max(0, Math.floor((Date.parse(now) - Date.parse(t)) / 86_400_000)) : 0);
     const stale = cfg.dashboard.stale_days > 0 && daysSince(since) > cfg.dashboard.stale_days;
     proposals.push({
-      opened, since, days: daysSince(opened), days_in_step: daysSince(since), stale,
+      opened, since, days: daysSince(opened), days_in_step: daysSince(since), stale, taken_by: p.taken ?? "",
       number: p.number, title: p.title, author: p.author, url: p.url, phase: r.phase, status, valid: r.errors.length === 0,
       for: r.tally?.for ?? 0, against: r.tally?.against ?? 0, forPeople: r.tally?.forPeople ?? 0, againstPeople: r.tally?.againstPeople ?? 0,
       next, votes: (r.tally?.votes ?? []).map(({ user, vote, weight }) => ({ user, vote, weight })),
@@ -264,7 +319,7 @@ export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg
     wanted.sort((a, b) => b.up - a.up || (a.id < b.id ? -1 : 1));
     wanted.length = Math.min(wanted.length, cfg.demand.top);
   }
-  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, proposals, overview: overviewOf(roots), tree: roots };
+  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, ...recentOf(flat, proposals, extra.merges, cfg, now), proposals, overview: overviewOf(roots), tree: roots };
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
@@ -326,6 +381,25 @@ function renderSpecs(nodes: string[]): string {
   return `<details class="specs"><summary>${nodes.length} specs${where}</summary>${codes}</details>`;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const RECENT_SHOWN = 8;
+
+function renderRecent(data: DashData, window: number): string {
+  if (!data.recent || !data.pace) return "";
+  const pace = `Specs done: ${data.pace.d30} in the last 30 days, ${data.pace.d90} in the last 90.`;
+  if (!data.recent.length) return `<h2>Lately</h2>\n<p class="muted">Nothing changed in the last ${plural(window, "day")}. ${pace}</p>`;
+  const line = (e: RecentEntry) => {
+    const d = new Date(e.at);
+    return `<li><span class="muted when">${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}</span> ${pill(e.kind)} <a href="${esc(e.url)}">${esc(e.title)}</a>${
+      e.ids.length > 1 ? ` <span class="muted">${e.ids.length} specs</span>` : ""
+    }</li>`;
+  };
+  const more = data.recent.length - RECENT_SHOWN;
+  return `<h2>Lately</h2>\n<ul class="recent">${data.recent.slice(0, RECENT_SHOWN).map(line).join("")}</ul><p class="muted">${
+    more > 0 ? `And ${more} more in the last ${plural(window, "day")}. ` : ""
+  }${pace}</p>`;
+}
+
 function renderQueue(data: DashData): string {
   if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
   const row = (p: DashPr) => {
@@ -334,7 +408,7 @@ function renderQueue(data: DashData): string {
       : "";
     return `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}${age}${
       p.stale ? ' <span class="pill bad">stale</span>' : ""
-    }</div>${renderSpecs(p.nodes)}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
+    }</div>${renderSpecs(p.nodes)}${p.taken_by && p.next === "code" ? `<div class="muted">Taken by @${esc(p.taken_by)}</div>` : ""}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
       p,
       data.threshold,
     )}</td><td>${renderNext(p)}</td></tr>`;
@@ -481,7 +555,7 @@ function renderVotes(p: DashPr, threshold: number): string {
 function renderNext(p: DashPr): string {
   const hint: Record<NextStep, string> = {
     fix: "The spec has problems. The vote starts when it is valid.",
-    votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against.`,
+    votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
     code: "The spec is approved and frozen. The code goes in this pull request, or in another with <code>Implements: #" + p.number + "</code>.",
     review: "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge.",
@@ -560,6 +634,7 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .where{margin:4px 0}
 .button{display:inline-block;padding:6px 14px;border-radius:8px;background:var(--link);color:var(--bg);font-weight:600;font-size:15px}.button:hover{text-decoration:none;opacity:.9}
 .want{font-size:13px;white-space:nowrap}
+.recent li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:4px 0}.recent .when{min-width:52px}
 .wanted{margin:0;padding-left:24px;list-style:decimal}.wanted li{margin:4px 0}
 .actions{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}.actions a{font-weight:600}
 .stands{margin:8px 0 4px}
@@ -621,6 +696,7 @@ table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:aut
 ${intro}
 ${wanted}
 ${renderOverview(data.overview, first)}
+${renderRecent(data, cfg.dashboard.recent_days)}
 ${fresh ? "" : `<h2>Open proposals</h2>\n<div class="box">${proposals}</div>`}
 <h2 id="specs">Specs</h2>
 ${renderFind(data)}

@@ -80,6 +80,12 @@ dashboard:
   path: ""                        # publish the page under this path
   host: github-pages              # or cloudflare, for a private repository (see section 2)
   project: ""                     # with host cloudflare: the Cloudflare Pages project
+  collapse_over: 40               # with more specs than this, the page opens with its groups closed; 0 never closes them
+  stale_days: 30                  # a proposal this long in one step is marked stale; 0 marks none
+  recent_days: 30                 # the window of "Lately" on the page; 0 leaves it out
+demand:
+  enabled: true                   # count thumbs-up on a spec's thread as demand, and show it on the page
+  top: 3                          # how many specs "Most wanted" lists; 0 hides it
 ```
 
 The settings are read from the default branch. A pull request cannot change them for itself.
@@ -143,6 +149,13 @@ A pull request needs no spec when:
 - a maintainer adds the label `no-spec`.
 
 ## Updating
+
+Voting with a comment (`/spectree for`) needs the signal workflow to run on comments. `spectree init` writes it that way since November 2026. A repository set up before that adds these lines under `on:` in `.github/workflows/spectree-signal.yml`, or runs `spectree init` again:
+
+```yaml
+  issue_comment:
+    types: [created, edited]
+```
 
 The workflow file points at the `v1` tag. The tag moves by itself to every commit on spectree's main branch that passes its tests, so a change to the checks or to the roadmap page reaches your repository with its next run. Nothing to do.
 

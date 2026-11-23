@@ -19,12 +19,13 @@ A spec is short. With spectree the maintainer first reads what a change is meant
 ```
 
 - **The roadmap is a directory tree.** Every directory under `roadmap/` with a `spec.md` is a node: epics, tasks, subtasks, to any depth.
-- **Votes are pull-request reviews.** GitHub stores them. Maintainers' votes have weight 1 and everyone else's have weight 0 by default, so outside votes are visible and maintainers decide.
+- **Votes are pull-request reviews**, or a comment that says `/spectree for` or `/spectree against`. GitHub stores them. Maintainers' votes have weight 1 and everyone else's have weight 0 by default, so outside votes are visible and maintainers decide.
 - **Three checks** report on every pull request:
   - `spectree/spec`: is there an approved spec?
   - `spectree/phase`: is code arriving only after approval?
   - `spectree/scope`: does the code stay inside the paths the spec named, and does every acceptance criterion name a test that exists?
-- **A roadmap page** on GitHub Pages shows every spec as done, in progress, approved or proposed, with the live vote count of each open proposal.
+- **A roadmap page** on GitHub Pages shows every spec as done, in progress, approved, proposed or planned. It opens with an overview by area and horizon and what changed lately, lists open proposals by what they wait for, and can be searched and filtered. Each spec opens to its whole text and links to GitHub's forms to edit it, build it or propose one below it.
+- **Demand is separate from the vote.** Anyone can add a 👍 to a spec's thread; the page shows the count and the most wanted specs. It never changes a vote.
 - **No status is stored in any file.** It is worked out from the default branch and the open pull requests, so it cannot go stale.
 
 ## Add it to your repository
