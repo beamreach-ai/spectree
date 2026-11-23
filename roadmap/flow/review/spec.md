@@ -7,6 +7,10 @@ paths:
   - src/commands.ts
   - src/dashboard.ts
   - test/review.test.ts
+  - test/core.test.ts
+  - test/run.test.ts
+  - test/commands.test.ts
+  - test/layout.test.ts
   - dist/**
 criteria:
   - id: needs-review
@@ -99,10 +103,10 @@ The default is on. A repository that follows `v1` gets the code review with its 
   | `review.threshold: 0` | success | `Code phase: the spec is approved and frozen` (today's text) |
 
   "Only maintainers write the code" and "Code before approval" still fail first.
-- **The comment.** Under the spec vote, a second table `Code review: open` or `Code review: passed`, with the same columns and the list of votes. The `Next` line reads "The spec is frozen. The code needs an approving review of the latest commit from someone whose vote has weight." while open, and "This pull request can merge." when passed.
+- **The comment.** Under the spec vote, a second table `Code review: open` or `Code review: passed`, with the same columns, the list of votes, and the line "Counted on commit `<sha>`. A new commit asks for the review again." The `Next` line reads "The spec is frozen. The code needs an approving review of the latest commit from someone whose vote has weight." while open, and "This pull request can merge." when passed.
 - **`/spectree status`** needs no change: it repeats the phase check's text.
 - **The command help** says that `/spectree for` and `against` are about the code once the spec is approved.
-- **The roadmap page.** "In code review" lists a proposal while its code review is open, with `0 of 1 for, 0 against` in the votes column and the hint "Review the code: Approve on the latest commit, or comment `/spectree for`." When the review has passed, the proposal is under "Ready to merge". Each proposal in `roadmap.json` gains `review`: `null` outside the code phase, or `{ "for": 0, "against": 0, "needed": 1, "passed": false }`.
+- **The roadmap page.** "In code review" lists a proposal while its code review is open, with `Code: 0 of 1 for, 0 against` in the votes column, under the spec vote, and the hint "Review the code: Approve on the latest commit, or comment `/spectree for`." When the review has passed, the proposal is under "Ready to merge". Each proposal in `roadmap.json` gains `review`: `null` outside the code phase, or `{ "for": 0, "against": 0, "needed": 1, "passed": false }`.
 
 ## What changes in the code
 
@@ -111,7 +115,7 @@ The default is on. A repository that follows `v1` gets the code review with its 
 - `src/run.ts`: records the first time it saw each head commit in the ledger it keeps for spec digests, and fills `onHead` from it.
 - `src/commands.ts`: the help text.
 - `src/dashboard.ts`: `nextOf` returns `merge` for a code-phase proposal whose review has passed; `DashPr` gains `review`; the votes column and the hint for the review step.
-- Tests in a new file, `test/review.test.ts`. Existing tests that expect a green phase check for outside code without a review are changed to give the review.
+- Tests in a new file, `test/review.test.ts`. Four existing files change where they assume the old behaviour: `test/core.test.ts` and `test/run.test.ts` expect a green phase check for an outsider's code that nobody approved, and now give the approval; `test/commands.test.ts` reads the ledger, which gains the head commit; `test/layout.test.ts` reads the votes column, which gains the code line.
 - `docs/` and `README.md` are updated in the same pull request; they need no spec.
 
 ## Not in this spec
