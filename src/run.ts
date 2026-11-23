@@ -157,7 +157,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
       if (result.removeLabel) await o.gh.removeLabel(n, LABEL_APPROVED);
       if (result.close) await o.gh.closePull(n);
       o.log(`#${n} ${result.phase}: spec ${result.statuses.spec.state}, phase ${result.statuses.phase.state}, scope ${result.statuses.scope.state}`);
-      summaries.push({ number: n, title: pull.title, author, url: pull.html_url, result });
+      summaries.push({ number: n, title: pull.title, author, url: pull.html_url, opened: pull.created_at ?? "", result });
     } catch (e) {
       failed++;
       o.log(`::error::#${n}: ${(e as Error).message}`);

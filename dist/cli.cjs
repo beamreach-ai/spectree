@@ -7378,7 +7378,7 @@ var DEFAULTS = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40 }
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30 }
 };
 function loadConfig(text) {
   const errors = [];
@@ -7436,7 +7436,7 @@ function loadConfig(text) {
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== void 0) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
@@ -7444,6 +7444,10 @@ function loadConfig(text) {
           if (d.collapse_over !== void 0) {
             if (typeof d.collapse_over === "number" && Number.isInteger(d.collapse_over) && d.collapse_over >= 0) config.dashboard.collapse_over = d.collapse_over;
             else errors.push("dashboard.collapse_over must be a whole number, 0 or more");
+          }
+          if (d.stale_days !== void 0) {
+            if (typeof d.stale_days === "number" && Number.isInteger(d.stale_days) && d.stale_days >= 0) config.dashboard.stale_days = d.stale_days;
+            else errors.push("dashboard.stale_days must be a whole number, 0 or more");
           }
           if (d.project !== void 0) {
             if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;
@@ -7700,7 +7704,17 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     const r = p.result;
     if (r.phase === "none" || r.phase === "missing") continue;
     const status = statusOf(r.phase);
+    const next = nextOf(r);
+    const opened = p.opened ?? "";
+    const since = next !== "votes" && next !== "fix" && r.record ? r.record.at : opened;
+    const daysSince = (t) => t ? Math.max(0, Math.floor((Date.parse(now) - Date.parse(t)) / 864e5)) : 0;
+    const stale = cfg.dashboard.stale_days > 0 && daysSince(since) > cfg.dashboard.stale_days;
     proposals.push({
+      opened,
+      since,
+      days: daysSince(opened),
+      days_in_step: daysSince(since),
+      stale,
       number: p.number,
       title: p.title,
       author: p.author,
@@ -7712,7 +7726,7 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
       against: r.tally?.against ?? 0,
       forPeople: r.tally?.forPeople ?? 0,
       againstPeople: r.tally?.againstPeople ?? 0,
-      next: nextOf(r),
+      next,
       votes: (r.tally?.votes ?? []).map(({ user, vote, weight }) => ({ user, vote, weight })),
       nodes: r.nodes.map((n) => n.id)
     });
@@ -7732,10 +7746,7 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     (parent ? parent.children : roots).push(node);
   }
   const roll = (n) => {
-    if (n.kind === "leaf" || !n.children.length) {
-      if (n.kind === "leaf") n.counts[n.status] = 1;
-      return n.counts;
-    }
+    if (n.kind === "leaf") n.counts[n.status] = 1;
     for (const c of n.children) for (const [k, v] of Object.entries(roll(c))) n.counts[k] += v;
     return n.counts;
   };
@@ -7765,6 +7776,41 @@ function renderOverview(o, first) {
   return `<h2>Overview</h2>
 <div class="box"><table class="overview"><thead><tr><th${span}>${esc(first)}</th><th${span}>Progress</th>${stages}${planned}</tr></thead><tbody>${o.rows.map(row).join("")}${row(o.all)}</tbody></table></div>`;
 }
+var HORIZON_CLASS = { now: "now", next: "next", later: "later" };
+var bar = (done, total) => `<span class="bar"><span style="width:${total ? Math.round(done / total * 100) : 0}%"></span></span>`;
+var STEPS = ["votes", "fix", "code", "review", "merge"];
+var STEP_TITLE = {
+  votes: "Needs votes",
+  fix: "Needs a fix to the spec",
+  code: "Approved, waiting for code",
+  review: "In code review",
+  merge: "Ready to merge"
+};
+var days = (n) => n === 0 ? "today" : n === 1 ? "1 day" : `${n} days`;
+function renderSpecs(nodes) {
+  const codes = nodes.map((n) => `<code>${esc(n)}</code>`).join(" ");
+  if (nodes.length <= 3) return `<div>${codes}</div>`;
+  const parts = nodes.map((n) => n.split("/"));
+  let shared = 0;
+  while (parts.every((p) => p.length > shared + 1 && p[shared] === parts[0][shared])) shared++;
+  const where = shared ? ` in <code>${esc(parts[0].slice(0, shared).join("/"))}</code>` : "";
+  return `<details class="specs"><summary>${nodes.length} specs${where}</summary>${codes}</details>`;
+}
+function renderQueue(data) {
+  if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
+  const row = (p) => {
+    const age = p.opened ? ` \xB7 opened ${p.days ? days(p.days) + " ago" : "today"}${p.days_in_step !== p.days ? ` \xB7 ${p.days_in_step ? days(p.days_in_step) : "since today"} in this step` : ""}` : "";
+    return `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
+      p,
+      data.threshold
+    )}</td><td>${renderNext(p)}</td></tr>`;
+  };
+  const groups = STEPS.map((step) => {
+    const list = data.proposals.filter((p) => p.next === step).sort((a, b) => b.days_in_step - a.days_in_step || a.number - b.number);
+    return list.length ? `<tbody data-step="${step}"><tr class="step"><th colspan="4">${STEP_TITLE[step]} <span class="muted">${list.length}</span></th></tr>${list.map(row).join("")}</tbody>` : "";
+  }).join("");
+  return `<table class="queue"><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead>${groups}</table>`;
+}
 var NEXT = {
   fix: "A fix to the spec",
   votes: "Votes",
@@ -7774,10 +7820,10 @@ var NEXT = {
 };
 var CONTRIBUTING = "https://github.com/beamreach-ai/spectree/blob/main/docs/contributing-with-specs.md";
 function renderDetail(n) {
-  if (!n.summary && !n.criteria.length) return "";
+  const where = `<p class="muted where"><span class="level">${esc(n.level)}</span> <code>${esc(n.id)}</code></p>`;
   const summary = n.summary ? `<p>${inline(n.summary)}</p>` : "";
   const criteria = n.criteria.length ? `<ol class="criteria">${n.criteria.map((c) => `<li><span>${inline(c.text)}</span> <span class="muted">Tested in ${c.tests.map((t) => `<code>${esc(t)}</code>`).join(", ")}</span></li>`).join("")}</ol>` : "";
-  return `<div class="detail">${summary}${criteria}</div>`;
+  return `<div class="detail">${where}${summary}${criteria}</div>`;
 }
 function renderFind(data) {
   if (!data.tree.length) return "";
@@ -7793,21 +7839,23 @@ function renderFind(data) {
   )}${o.rows.map((r) => option(r.id, r.title)).join("")}</select><span class="muted" id="find-count" aria-live="polite"></span><button type="reset" id="find-clear" hidden>Clear</button></form>`;
 }
 function renderNode(n, repoUrl, root, closed) {
-  const counts = n.kind === "group" ? ORDER.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ") : "";
+  const total = ORDER.reduce((a, s) => a + n.counts[s], 0);
+  const counts = n.kind === "group" ? `${bar(n.counts.done, total)}<span class="muted">${n.counts.done} of ${total} done</span> ${STAGES.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ")}${n.counts.planned ? ` <span class="muted">${n.counts.planned} planned</span>` : ""}` : "";
+  const mark = n.status !== "planned" ? pill(n.status) : `<span class="pill hz hz-${HORIZON_CLASS[n.horizon] ?? "other"}">${esc(n.horizon || "Planned")}</span>`;
   const open = n.open.map((o) => `<a class="pr" href="${repoUrl}/pull/${o.pr}">#${o.pr} ${o.change === "added" ? "" : o.change + ", "}${LABEL[o.status].toLowerCase()}</a>`).join(" ");
   const inMain = (n.status === "done" || n.status === "planned") && !n.open.some((o) => o.change === "added");
   const href = inMain ? `${repoUrl}/blob/HEAD/${root}/${n.id}/spec.md` : n.open[0] ? `${repoUrl}/pull/${n.open[0].pr}` : "#";
   const many = n.criteria.length ? `<span class="muted">${plural(n.criteria.length, "criterion", "criteria")}</span>` : "";
-  const head = `<span class="level">${esc(n.level)}</span> <a class="title" href="${href}">${esc(n.title)}</a> <code>${esc(n.name)}</code> ${n.kind === "leaf" ? pill(n.status, n.status === "planned" && n.horizon ? `Planned: ${n.horizon}` : LABEL[n.status]) : counts || pill(n.status)} ${inMain || n.kind === "group" ? open : ""} ${many}`;
+  const head = `<a class="title" title="${esc(n.title)}" href="${href}">${esc(n.title)}</a> ${n.kind === "leaf" ? mark : counts} ${inMain || n.kind === "group" ? open : ""} ${many}`;
   const detail = renderDetail(n);
   const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root, closed)).join("")}</ul>` : "";
   const text = `${n.title} ${n.id} ${n.summary}`.toLowerCase();
   const li = `<li class="node" id="spec-${esc(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc(n.horizon)}" data-text="${esc(text)}">`;
-  if (!detail && !kids) return `${li}<div class="row plain">${head}</div></li>`;
   return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
 }
 function renderVotes(p, threshold) {
   const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
+  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return "<div>Approved</div>";
   const lines = [`<div>${p.for} of ${threshold} for, ${p.against} against</div>`];
   if (who("for")) lines.push(`<div class="muted">For: ${who("for")}</div>`);
   if (who("against")) lines.push(`<div class="muted">Against: ${who("against")}</div>`);
@@ -7830,18 +7878,25 @@ function renderHtml(data, cfg, serverUrl = "https://github.com") {
   const over = cfg.dashboard.collapse_over;
   const closed = over > 0 && data.overview.all.total > over;
   const known = { statuses: ORDER, horizons: data.overview.horizons, tops: data.overview.rows.map((r) => r.id) };
-  const proposals = data.proposals.length ? `<table><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead><tbody>${data.proposals.map(
-    (p) => `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}</div><div>${p.nodes.map((n) => `<code>${esc(n)}</code>`).join(" ")}</div></td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
-      p,
-      data.threshold
-    )}</td><td>${renderNext(p)}</td></tr>`
-  ).join("")}</tbody></table>` : `<p class="muted">No open spec pull requests.</p>`;
-  const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root, closed)).join("")}</ul>` : `<p class="muted">No specs yet. Add the first one under <code>${esc(cfg.root)}/</code>.</p>`;
+  const proposals = renderQueue(data);
+  const fresh = !data.tree.length && !data.proposals.length;
+  const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root, closed)).join("")}</ul>` : `<div class="empty"><p><strong>No specs yet.</strong> A spec is a file, <code>${esc(cfg.root)}/&lt;name&gt;/spec.md</code>, that says what one part of the project does and names the tests that prove it. Add the first one in a pull request.</p><p>To check the tree on your machine:</p><pre>npx github:beamreach-ai/spectree validate
+npx github:beamreach-ai/spectree tree</pre></div>`;
   const against = data.max_against === 0 ? "none against" : `at most ${data.max_against} against`;
-  const intro = `Every change to ${esc(name)} starts as a spec under <code>${esc(cfg.root)}/</code>, proposed in a pull request. People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
+  const intro = `<details class="how" id="how" open><summary>How changes are made here</summary><ol class="steps"><li><strong>Propose.</strong> Every change to ${esc(
+    name
+  )} starts as a spec under <code>${esc(cfg.root)}/</code>, proposed in a pull request.</li><li><strong>Vote.</strong> People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
     data.threshold,
     "weighted vote"
-  )} for and ${against}. People with write access weigh 1, and everyone else's vote is shown. After the vote, the code is added to the same pull request and spec and code merge together. <a href="${CONTRIBUTING}">How to propose a spec and vote</a>.`;
+  )} for and ${against}. People with write access weigh 1, and everyone else's vote is shown.</li><li><strong>Build.</strong> After the vote, the code is added to the same pull request and spec and code merge together.</li></ol><p class="muted"><a href="${CONTRIBUTING}">How to propose a spec and vote</a>.</p></details>`;
+  const howScript = `(function () {
+  var how = document.getElementById("how");
+  if (!how) return;
+  try {
+    if (localStorage.getItem("spectree-how") === "closed") how.open = false;
+    how.addEventListener("toggle", function () { localStorage.setItem("spectree-how", how.open ? "open" : "closed"); });
+  } catch (e) {}
+})();`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -7861,7 +7916,17 @@ h1{font-size:28px;margin:0 0 4px}
 h2{font-size:18px;margin:36px 0 12px}
 a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .muted{color:var(--muted);font-size:14px}
-.intro{max-width:720px;margin:12px 0 0}
+.how{margin:16px 0 0}.how>summary{font-weight:600;font-size:14px;color:var(--muted)}.how>summary::before{content:"\u25B8 "}.how[open]>summary::before{content:"\u25BE "}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:10px 0 6px;padding:0;list-style:none;counter-reset:step}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px}
+.how p{margin:0}
+@media (max-width:720px){.steps{grid-template-columns:1fr}}
+.empty pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.queue .step th{padding-top:16px;font-size:14px;color:var(--fg);border-bottom:1px solid var(--line)}.queue tbody:first-of-type .step th{padding-top:6px}
+.specs summary{font-size:14px;color:var(--muted)}.specs summary::before{content:"\u25B8 "}.specs[open] summary::before{content:"\u25BE "}
+.hz{color:var(--muted);background:var(--line)}.hz::before{content:"\u25CF ";font-size:10px;vertical-align:1px}
+.hz-now{color:var(--done);background:var(--done-bg)}.hz-next{color:var(--appr);background:var(--appr-bg)}.hz-later{color:var(--muted);background:var(--line)}.hz-other{color:var(--prog);background:var(--prog-bg)}
+.where{margin:4px 0}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .pill.done{color:var(--done);background:var(--done-bg)}.pill.in_progress{color:var(--prog);background:var(--prog-bg)}
@@ -7888,7 +7953,10 @@ td:first-child{width:38%}td:last-child{width:32%}
 .next{font-weight:600}
 ul{list-style:none;margin:0;padding:0}
 .tree ul{margin-left:4px;padding-left:16px;border-left:1px solid var(--line)}
-.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:7px 0}
+.row{display:flex;align-items:center;gap:6px 8px;padding:7px 0}.row>*{flex:none}
+.row .title{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .bar{width:56px;margin-right:0}
+@media (max-width:640px){.row{flex-wrap:wrap}.row .title{flex-basis:100%}}
 .row.plain{padding-left:15px}
 summary{cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}
 summary.row::before{content:"";width:0;height:0;margin-right:2px;border-left:5px solid var(--muted);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
@@ -7901,17 +7969,17 @@ details[open]>summary.row::before{transform:rotate(90deg)}
 .criteria{margin:6px 0;padding-left:20px}.criteria li{margin:4px 0}.criteria .muted{display:block;font-size:13px}
 footer{margin-top:40px}
 @media (max-width:640px){table:not(.overview),table:not(.overview) tbody,table:not(.overview) tr,table:not(.overview) td{display:block}table:not(.overview) thead{display:none}table:not(.overview){min-width:0}
-table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) tr{padding:10px 0;border-bottom:1px solid var(--line)}table:not(.overview) tr:last-child{border-bottom:0}}
+table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) tr{padding:10px 0;border-bottom:1px solid var(--line)}table:not(.overview) tr:last-child{border-bottom:0}}
 </style>
 </head>
 <body>
 <main>
 <h1>${esc(name)} roadmap</h1>
 <div class="muted"><a href="${repoUrl}">${esc(data.repository)}</a></div>
-<p class="intro">${intro}</p>
+${intro}
 ${renderOverview(data.overview, first)}
-<h2>Open proposals</h2>
-<div class="box">${proposals}</div>
+${fresh ? "" : `<h2>Open proposals</h2>
+<div class="box">${proposals}</div>`}
 <h2 id="specs">Specs</h2>
 ${renderFind(data)}
 <div class="box">${tree}</div>
@@ -7919,6 +7987,7 @@ ${renderFind(data)}
 </main>
 ${data.tree.length ? `<script>
 ${findScript(known)}
+${howScript}
 </script>` : ""}
 </body>
 </html>
