@@ -1,6 +1,7 @@
 import type { Config } from "./config.ts";
 import type { NodeChange, Phase, PrResult } from "./evaluate.ts";
 import { findScript, writeView } from "./find.ts";
+import { renderMarkdown } from "./markdown.ts";
 import { type Criterion, type Spec, levelName } from "./tree.ts";
 
 export type NodeStatus = "done" | "planned" | "proposed" | "approved" | "in_progress";
@@ -28,6 +29,13 @@ export interface DashNode {
   summary: string;
   /** The default branch's criteria, or the proposed ones for a node that is not there yet. */
   criteria: Criterion[];
+  /** The spec's body, as Markdown: the default branch's, or the proposed one for a node that is not there yet. */
+  body: string;
+  /** Demand: distinct people with a thumbs-up, and with a thumbs-down, on the spec's thread or on the pull request that adds it. */
+  up: number;
+  down: number;
+  /** The address of the spec's thread; empty when nobody has opened it. */
+  thread: string;
   children: DashNode[];
 }
 
@@ -91,10 +99,50 @@ export interface DashData {
   threshold: number;
   max_against: number;
   levels: string[];
+  /** The default branch, for links that open GitHub's forms. */
+  branch: string;
+  /** The specs not done that most people want, most wanted first. */
+  wanted: { id: string; title: string; up: number }[];
   proposals: DashPr[];
   overview: Overview;
   tree: DashNode[];
 }
+
+export const THREAD_LABEL = "spectree";
+export interface Demand {
+  up: number;
+  down: number;
+}
+export interface Thread extends Demand {
+  number: number;
+  url: string;
+}
+/** What the page needs beyond the specs and the pull requests. */
+export interface Extra {
+  branch?: string;
+  /** Threads by spec id. */
+  threads?: Record<string, Thread>;
+  /** Reactions on a pull request's description, by its number. */
+  reactions?: Record<number, Demand>;
+}
+/** GitHub's summary of reactions on a post. One person has one of each, so the counts are people. */
+export const demandOf = (reactions: any): Demand => ({ up: Number(reactions?.["+1"] ?? 0), down: Number(reactions?.["-1"] ?? 0) });
+
+/** The file GitHub's new-file form opens with. It is a valid spec as it stands. */
+export const TEMPLATE = `---
+title: "What it does, in a few words"
+paths:
+  - src/**
+criteria:
+  - id: first
+    text: "One thing that is true when this is built."
+    tests: [test/first.test.ts]
+---
+
+Why this is needed, in a paragraph.
+
+Not in this spec: what it leaves out.
+`;
 
 export interface PrSummary {
   number: number;
@@ -154,11 +202,11 @@ export function overviewOf(roots: DashNode[]): Overview {
 }
 
 /** The roadmap: the default branch's nodes are done; open spec pull requests add the other three statuses. */
-export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg: Config, repository: string, now: string): DashData {
+export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg: Config, repository: string, now: string, extra: Extra = {}): DashData {
   const flat = new Map<string, DashNode>();
   const make = (id: string, title: string, kind: "leaf" | "group", status: NodeStatus, body: string, criteria: Criterion[], horizon = ""): DashNode => ({
     id, horizon, name: id.split("/").pop()!, title, kind, level: levelName(id, cfg.levels), status, open: [], counts: zero(),
-    summary: summaryOf(body), criteria, children: [],
+    summary: summaryOf(body), criteria, body, up: 0, down: 0, thread: "", children: [],
   });
   for (const s of Object.values(mainSpecs))
     flat.set(s.id, make(s.id, s.title, s.kind, s.planned === null ? "done" : "planned", s.body, s.criteria, s.planned ?? ""));
@@ -204,7 +252,19 @@ export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg
     return n.counts;
   };
   roots.forEach(roll);
-  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, proposals, overview: overviewOf(roots), tree: roots };
+  const wanted: DashData["wanted"] = [];
+  if (cfg.demand.enabled) {
+    for (const node of flat.values()) {
+      const t = extra.threads?.[node.id];
+      if (t) node.thread = t.url;
+      const d: Demand | undefined = mainSpecs[node.id] ? t : (extra.reactions?.[node.open.find((o) => o.change === "added")?.pr ?? -1] ?? t);
+      if (d) (node.up = d.up), (node.down = d.down);
+      if (node.up > 0 && node.status !== "done") wanted.push({ id: node.id, title: node.title, up: node.up });
+    }
+    wanted.sort((a, b) => b.up - a.up || (a.id < b.id ? -1 : 1));
+    wanted.length = Math.min(wanted.length, cfg.demand.top);
+  }
+  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, proposals, overview: overviewOf(roots), tree: roots };
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
@@ -296,7 +356,60 @@ const NEXT: Record<NextStep, string> = {
 };
 const CONTRIBUTING = "https://github.com/beamreach-ai/spectree/blob/main/docs/contributing-with-specs.md";
 
-function renderDetail(n: DashNode): string {
+interface Ctx {
+  repoUrl: string;
+  root: string;
+  closed: boolean;
+  branch: string;
+  demand: boolean;
+  prs: Map<number, DashPr>;
+  threshold: number;
+}
+const enc = encodeURIComponent;
+const newSpecUrl = (c: Pick<Ctx, "repoUrl" | "branch" | "root">, under: string) =>
+  `${c.repoUrl}/new/${enc(c.branch)}?filename=${enc(`${c.root}/${under ? under + "/" : ""}new-spec/spec.md`)}&value=${enc(TEMPLATE)}`;
+
+/** The whole body, where the spec stands, and what a visitor can do with it. */
+function renderMore(n: DashNode, c: Ctx): string {
+  const specPath = `${c.root}/${n.id}/spec.md`;
+  const adds = n.open.find((o) => o.change === "added");
+  const inMain = !adds;
+  const whole =
+    n.body.trim() && n.body.replace(/\s+/g, " ").trim() !== n.summary
+      ? `<details class="whole"><summary>The whole spec</summary><div class="md">${renderMarkdown(n.body, (p) => `${c.repoUrl}/blob/${enc(c.branch)}/${p}`)}</div></details>`
+      : "";
+  const stands: string[] = [n.status === "planned" && n.horizon ? `Planned: ${esc(n.horizon)}` : LABEL[n.status]];
+  if (adds) stands.push(`proposed in <a href="${c.repoUrl}/pull/${adds.pr}">#${adds.pr}</a>, not in the default branch yet`);
+  for (const o of n.open) {
+    const p = c.prs.get(o.pr);
+    const tally = p ? `: ${p.for} of ${c.threshold} for, ${p.against} against` : "";
+    if (o !== adds) stands.push(`<a href="${c.repoUrl}/pull/${o.pr}">#${o.pr}</a> proposes to ${o.change === "removed" ? "remove it" : "change it"}${tally}; the text here is the default branch's`);
+    else if (tally) stands.push(`vote${tally}`);
+  }
+  if (c.demand && (n.up || n.down)) stands.push(`${n.up} 👍${n.down ? `, ${n.down} 👎` : ""}`);
+  const act: string[] = [];
+  const link = (href: string, text: string, title = "") => act.push(`<a href="${esc(href)}"${title ? ` title="${esc(title)}"` : ""}>${text}</a>`);
+  const editUrl = `${c.repoUrl}/edit/${enc(c.branch)}/${specPath}`;
+  if (inMain) {
+    link(editUrl, "Edit", "Opens GitHub's editor; saving proposes the change in a pull request");
+    if (c.demand)
+      link(
+        n.thread ||
+          `${c.repoUrl}/issues/new?title=${enc(n.id)}&labels=${THREAD_LABEL}&body=${enc(`The thread of the spec \`${n.id}\`: ${c.repoUrl}/blob/${c.branch}/${specPath}\n\nA 👍 on this post says you want it. Discussion goes below.`)}`,
+        n.thread ? "Discuss or 👍" : "Start its thread",
+        "A thumbs-up on the thread's first post says you want this spec",
+      );
+    link(newSpecUrl(c, n.id), "Add a spec below");
+    if (n.kind === "leaf" && n.status === "planned") link(editUrl, "Build this", "Remove planned, add paths and criteria, and bring the code in the same pull request");
+  } else {
+    link(`${c.repoUrl}/pull/${adds.pr}/files`, "Edit", "The spec is in this pull request; changes go there");
+    link(`${c.repoUrl}/pull/${adds.pr}`, c.demand ? "Discuss or 👍" : "Discuss", "A thumbs-up on the pull request's description says you want this spec");
+    if (n.kind === "leaf" && n.status === "approved") link(`${c.repoUrl}/pull/${adds.pr}`, "Take it", `Write the code in that pull request, or in your own whose description says Implements: #${adds.pr}`);
+  }
+  return `${whole}<p class="muted stands">${stands.join(" · ")}</p><p class="actions">${act.join(" ")}</p>`;
+}
+
+function renderDetail(n: DashNode, c: Ctx): string {
   const where = `<p class="muted where"><span class="level">${esc(n.level)}</span> <code>${esc(n.id)}</code></p>`;
   const summary = n.summary ? `<p>${inline(n.summary)}</p>` : "";
   const criteria = n.criteria.length
@@ -304,7 +417,7 @@ function renderDetail(n: DashNode): string {
         .map((c) => `<li><span>${inline(c.text)}</span> <span class="muted">Tested in ${c.tests.map((t) => `<code>${esc(t)}</code>`).join(", ")}</span></li>`)
         .join("")}</ol>`
     : "";
-  return `<div class="detail">${where}${summary}${criteria}</div>`;
+  return `<div class="detail">${where}${summary}${criteria}${renderMore(n, c)}</div>`;
 }
 
 function renderFind(data: DashData): string {
@@ -323,7 +436,8 @@ function renderFind(data: DashData): string {
   )}${o.rows.map((r) => option(r.id, r.title)).join("")}</select><span class="muted" id="find-count" aria-live="polite"></span><button type="reset" id="find-clear" hidden>Clear</button></form>`;
 }
 
-function renderNode(n: DashNode, repoUrl: string, root: string, closed: boolean): string {
+function renderNode(n: DashNode, c: Ctx): string {
+  const { repoUrl, root, closed } = c;
   const total = ORDER.reduce((a, s) => a + n.counts[s], 0);
   const counts =
     n.kind === "group"
@@ -342,9 +456,9 @@ function renderNode(n: DashNode, repoUrl: string, root: string, closed: boolean)
   const many = n.criteria.length ? `<span class="muted">${plural(n.criteria.length, "criterion", "criteria")}</span>` : "";
   const head = `<a class="title" title="${esc(n.title)}" href="${href}">${esc(n.title)}</a> ${n.kind === "leaf" ? mark : counts} ${
     inMain || n.kind === "group" ? open : ""
-  } ${many}`;
-  const detail = renderDetail(n);
-  const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root, closed)).join("")}</ul>` : "";
+  } ${many}${c.demand && n.up ? ` <span class="want" title="${plural(n.up, "person wants", "people want")} this">👍 ${n.up}</span>` : ""}`;
+  const detail = renderDetail(n, c);
+  const kids = n.children.length ? `<ul>${n.children.map((k) => renderNode(k, c)).join("")}</ul>` : "";
   const text = `${n.title} ${n.id} ${n.summary}`.toLowerCase();
   const li = `<li class="node" id="spec-${esc(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc(n.horizon)}" data-text="${esc(text)}">`;
   return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
@@ -383,10 +497,19 @@ export function renderHtml(data: DashData, cfg: Config, serverUrl = "https://git
   const over = cfg.dashboard.collapse_over;
   const closed = over > 0 && data.overview.all.total > over;
   const known = { statuses: ORDER as string[], horizons: data.overview.horizons, tops: data.overview.rows.map((r) => r.id) };
+  const ctx: Ctx = {
+    repoUrl, root: cfg.root, closed, branch: data.branch, demand: cfg.demand.enabled, threshold: data.threshold,
+    prs: new Map(data.proposals.map((p) => [p.number, p])),
+  };
+  const wanted = data.wanted.length
+    ? `<h2>Most wanted</h2>\n<ol class="wanted">${data.wanted
+        .map((w) => `<li><a href="#spec-${esc(w.id)}">${esc(w.title)}</a> <span class="want">👍 ${w.up}</span></li>`)
+        .join("")}</ol>`
+    : "";
   const proposals = renderQueue(data);
   const fresh = !data.tree.length && !data.proposals.length;
   const tree = data.tree.length
-    ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root, closed)).join("")}</ul>`
+    ? `<ul class="tree">${data.tree.map((n) => renderNode(n, ctx)).join("")}</ul>`
     : `<div class="empty"><p><strong>No specs yet.</strong> A spec is a file, <code>${esc(cfg.root)}/&lt;name&gt;/spec.md</code>, that says what one part of the project does and names the tests that prove it. Add the first one in a pull request.</p><p>To check the tree on your machine:</p><pre>npx github:beamreach-ai/spectree validate
 npx github:beamreach-ai/spectree tree</pre></div>`;
   const against = data.max_against === 0 ? "none against" : `at most ${data.max_against} against`;
@@ -435,6 +558,16 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .hz{color:var(--muted);background:var(--line)}.hz::before{content:"● ";font-size:10px;vertical-align:1px}
 .hz-now{color:var(--done);background:var(--done-bg)}.hz-next{color:var(--appr);background:var(--appr-bg)}.hz-later{color:var(--muted);background:var(--line)}.hz-other{color:var(--prog);background:var(--prog-bg)}
 .where{margin:4px 0}
+.button{display:inline-block;padding:6px 14px;border-radius:8px;background:var(--link);color:var(--bg);font-weight:600;font-size:15px}.button:hover{text-decoration:none;opacity:.9}
+.want{font-size:13px;white-space:nowrap}
+.wanted{margin:0;padding-left:24px;list-style:decimal}.wanted li{margin:4px 0}
+.actions{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}.actions a{font-weight:600}
+.stands{margin:8px 0 4px}
+.whole>summary{font-size:14px;font-weight:600;color:var(--link)}.whole>summary::before{content:"▸ "}.whole[open]>summary::before{content:"▾ "}
+.md{font-size:15px;overflow-x:auto}.md h4,.md h5,.md h6{margin:14px 0 4px;font-size:15px}.md ul,.md ol,.tree .md ul{margin:6px 0;padding-left:22px;list-style:revert;border-left:0}.md li{margin:3px 0}
+.md pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto}.md pre code{color:var(--fg)}
+.md table{min-width:0;width:auto}.md th,.md td{padding:6px 14px 6px 0;font-size:14px;width:auto}.md td:first-child,.md td:last-child{width:auto}
+.md blockquote{margin:6px 0;padding-left:12px;border-left:3px solid var(--line);color:var(--muted)}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .pill.done{color:var(--done);background:var(--done-bg)}.pill.in_progress{color:var(--prog);background:var(--prog-bg)}
@@ -484,7 +617,9 @@ table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:aut
 <main>
 <h1>${esc(name)} roadmap</h1>
 <div class="muted"><a href="${repoUrl}">${esc(data.repository)}</a></div>
+<p><a class="button" href="${esc(newSpecUrl(ctx, ""))}">Propose a spec</a></p>
 ${intro}
+${wanted}
 ${renderOverview(data.overview, first)}
 ${fresh ? "" : `<h2>Open proposals</h2>\n<div class="box">${proposals}</div>`}
 <h2 id="specs">Specs</h2>

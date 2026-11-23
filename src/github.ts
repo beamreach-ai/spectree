@@ -63,6 +63,14 @@ export class GitHub {
   pullFiles = (n: number) => this.all(`/pulls/${n}/files`);
   reviews = (n: number) => this.all(`/pulls/${n}/reviews`);
   comments = (n: number) => this.all(`/issues/${n}/comments`);
+  /** Issues, open and closed, that carry a label. Pull requests are left out. */
+  issuesLabeled = async (label: string) => (await this.all(`/issues?state=all&labels=${encodeURIComponent(label)}`)).filter((i) => !i.pull_request);
+  issue = (n: number) => this.get(`/issues/${n}`);
+  /** Creates the label when the repository does not have it. */
+  async ensureLabel(name: string, color: string, description: string): Promise<void> {
+    const r = await this.call("GET", `/labels/${encodeURIComponent(name)}`);
+    if (r.status === 404) await this.write("POST", "/labels", { name, color, description });
+  }
   statuses = (sha: string) => this.all(`/commits/${sha}/statuses`);
 
   /** True when the user may push to the repository. */
