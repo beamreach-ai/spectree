@@ -55,6 +55,15 @@ export interface DashPr {
   next: NextStep;
   votes: DashVote[];
   nodes: string[];
+  /** When the pull request was opened; empty when not known. */
+  opened: string;
+  /** When it entered the step it is in: the approval for code, review and merge, the opening otherwise. */
+  since: string;
+  /** Whole days since it was opened, and since it entered its step. */
+  days: number;
+  days_in_step: number;
+  /** In its step for longer than `dashboard.stale_days`. */
+  stale: boolean;
 }
 
 /** One line of the overview: a top-level node, or the whole roadmap. */
@@ -92,6 +101,8 @@ export interface PrSummary {
   title: string;
   author: string;
   url: string;
+  /** When the pull request was opened. */
+  opened?: string;
   result: PrResult;
 }
 
@@ -157,10 +168,16 @@ export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg
     const r = p.result;
     if (r.phase === "none" || r.phase === "missing") continue;
     const status = statusOf(r.phase);
+    const next = nextOf(r);
+    const opened = p.opened ?? "";
+    const since = next !== "votes" && next !== "fix" && r.record ? r.record.at : opened;
+    const daysSince = (t: string) => (t ? Math.max(0, Math.floor((Date.parse(now) - Date.parse(t)) / 86_400_000)) : 0);
+    const stale = cfg.dashboard.stale_days > 0 && daysSince(since) > cfg.dashboard.stale_days;
     proposals.push({
+      opened, since, days: daysSince(opened), days_in_step: daysSince(since), stale,
       number: p.number, title: p.title, author: p.author, url: p.url, phase: r.phase, status, valid: r.errors.length === 0,
       for: r.tally?.for ?? 0, against: r.tally?.against ?? 0, forPeople: r.tally?.forPeople ?? 0, againstPeople: r.tally?.againstPeople ?? 0,
-      next: nextOf(r), votes: (r.tally?.votes ?? []).map(({ user, vote, weight }) => ({ user, vote, weight })),
+      next, votes: (r.tally?.votes ?? []).map(({ user, vote, weight }) => ({ user, vote, weight })),
       nodes: r.nodes.map((n) => n.id),
     });
     for (const n of r.nodes) {
@@ -181,10 +198,8 @@ export function buildData(mainSpecs: Record<string, Spec>, prs: PrSummary[], cfg
     (parent ? parent.children : roots).push(node);
   }
   const roll = (n: DashNode): Record<NodeStatus, number> => {
-    if (n.kind === "leaf" || !n.children.length) {
-      if (n.kind === "leaf") n.counts[n.status] = 1;
-      return n.counts;
-    }
+    // A leaf counts itself, and a leaf with specs under it counts them too.
+    if (n.kind === "leaf") n.counts[n.status] = 1;
     for (const c of n.children) for (const [k, v] of Object.entries(roll(c))) n.counts[k as NodeStatus] += v;
     return n.counts;
   };
@@ -228,6 +243,50 @@ function renderOverview(o: Overview, first: string): string {
     .join("")}${row(o.all)}</tbody></table></div>`;
 }
 
+const HORIZON_CLASS: Record<string, string> = { now: "now", next: "next", later: "later" };
+const bar = (done: number, total: number) => `<span class="bar"><span style="width:${total ? Math.round((done / total) * 100) : 0}%"></span></span>`;
+const STEPS: NextStep[] = ["votes", "fix", "code", "review", "merge"];
+const STEP_TITLE: Record<NextStep, string> = {
+  votes: "Needs votes",
+  fix: "Needs a fix to the spec",
+  code: "Approved, waiting for code",
+  review: "In code review",
+  merge: "Ready to merge",
+};
+const days = (n: number) => (n === 0 ? "today" : n === 1 ? "1 day" : `${n} days`);
+
+/** The specs of a proposal: listed when few, otherwise a count and the node they share, opening to the list. */
+function renderSpecs(nodes: string[]): string {
+  const codes = nodes.map((n) => `<code>${esc(n)}</code>`).join(" ");
+  if (nodes.length <= 3) return `<div>${codes}</div>`;
+  const parts = nodes.map((n) => n.split("/"));
+  let shared = 0;
+  while (parts.every((p) => p.length > shared + 1 && p[shared] === parts[0][shared])) shared++;
+  const where = shared ? ` in <code>${esc(parts[0].slice(0, shared).join("/"))}</code>` : "";
+  return `<details class="specs"><summary>${nodes.length} specs${where}</summary>${codes}</details>`;
+}
+
+function renderQueue(data: DashData): string {
+  if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
+  const row = (p: DashPr) => {
+    const age = p.opened
+      ? ` · opened ${p.days ? days(p.days) + " ago" : "today"}${p.days_in_step !== p.days ? ` · ${p.days_in_step ? days(p.days_in_step) : "since today"} in this step` : ""}`
+      : "";
+    return `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}${age}${
+      p.stale ? ' <span class="pill bad">stale</span>' : ""
+    }</div>${renderSpecs(p.nodes)}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
+      p,
+      data.threshold,
+    )}</td><td>${renderNext(p)}</td></tr>`;
+  };
+  const groups = STEPS.map((step) => {
+    // The one that has waited longest in its step comes first.
+    const list = data.proposals.filter((p) => p.next === step).sort((a, b) => b.days_in_step - a.days_in_step || a.number - b.number);
+    return list.length ? `<tbody data-step="${step}"><tr class="step"><th colspan="4">${STEP_TITLE[step]} <span class="muted">${list.length}</span></th></tr>${list.map(row).join("")}</tbody>` : "";
+  }).join("");
+  return `<table class="queue"><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead>${groups}</table>`;
+}
+
 const NEXT: Record<NextStep, string> = {
   fix: "A fix to the spec",
   votes: "Votes",
@@ -238,14 +297,14 @@ const NEXT: Record<NextStep, string> = {
 const CONTRIBUTING = "https://github.com/beamreach-ai/spectree/blob/main/docs/contributing-with-specs.md";
 
 function renderDetail(n: DashNode): string {
-  if (!n.summary && !n.criteria.length) return "";
+  const where = `<p class="muted where"><span class="level">${esc(n.level)}</span> <code>${esc(n.id)}</code></p>`;
   const summary = n.summary ? `<p>${inline(n.summary)}</p>` : "";
   const criteria = n.criteria.length
     ? `<ol class="criteria">${n.criteria
         .map((c) => `<li><span>${inline(c.text)}</span> <span class="muted">Tested in ${c.tests.map((t) => `<code>${esc(t)}</code>`).join(", ")}</span></li>`)
         .join("")}</ol>`
     : "";
-  return `<div class="detail">${summary}${criteria}</div>`;
+  return `<div class="detail">${where}${summary}${criteria}</div>`;
 }
 
 function renderFind(data: DashData): string {
@@ -265,7 +324,15 @@ function renderFind(data: DashData): string {
 }
 
 function renderNode(n: DashNode, repoUrl: string, root: string, closed: boolean): string {
-  const counts = n.kind === "group" ? ORDER.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ") : "";
+  const total = ORDER.reduce((a, s) => a + n.counts[s], 0);
+  const counts =
+    n.kind === "group"
+      ? `${bar(n.counts.done, total)}<span class="muted">${n.counts.done} of ${total} done</span> ${STAGES.filter((s) => n.counts[s])
+          .map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`))
+          .join(" ")}${n.counts.planned ? ` <span class="muted">${n.counts.planned} planned</span>` : ""}`
+      : "";
+  const mark =
+    n.status !== "planned" ? pill(n.status) : `<span class="pill hz hz-${HORIZON_CLASS[n.horizon] ?? "other"}">${esc(n.horizon || "Planned")}</span>`;
   const open = n.open
     .map((o) => `<a class="pr" href="${repoUrl}/pull/${o.pr}">#${o.pr} ${o.change === "added" ? "" : o.change + ", "}${LABEL[o.status].toLowerCase()}</a>`)
     .join(" ");
@@ -273,14 +340,13 @@ function renderNode(n: DashNode, repoUrl: string, root: string, closed: boolean)
   const inMain = (n.status === "done" || n.status === "planned") && !n.open.some((o) => o.change === "added");
   const href = inMain ? `${repoUrl}/blob/HEAD/${root}/${n.id}/spec.md` : n.open[0] ? `${repoUrl}/pull/${n.open[0].pr}` : "#";
   const many = n.criteria.length ? `<span class="muted">${plural(n.criteria.length, "criterion", "criteria")}</span>` : "";
-  const head = `<span class="level">${esc(n.level)}</span> <a class="title" href="${href}">${esc(n.title)}</a> <code>${esc(n.name)}</code> ${
-    n.kind === "leaf" ? pill(n.status, n.status === "planned" && n.horizon ? `Planned: ${n.horizon}` : LABEL[n.status]) : counts || pill(n.status)
-  } ${inMain || n.kind === "group" ? open : ""} ${many}`;
+  const head = `<a class="title" title="${esc(n.title)}" href="${href}">${esc(n.title)}</a> ${n.kind === "leaf" ? mark : counts} ${
+    inMain || n.kind === "group" ? open : ""
+  } ${many}`;
   const detail = renderDetail(n);
   const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root, closed)).join("")}</ul>` : "";
   const text = `${n.title} ${n.id} ${n.summary}`.toLowerCase();
   const li = `<li class="node" id="spec-${esc(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc(n.horizon)}" data-text="${esc(text)}">`;
-  if (!detail && !kids) return `${li}<div class="row plain">${head}</div></li>`;
   return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
 }
 
@@ -290,6 +356,8 @@ function renderVotes(p: DashPr, threshold: number): string {
       .filter((x) => x.vote === v)
       .map((x) => `@${esc(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`)
       .join(", ");
+  // Once the vote has passed with nobody but the author voting, the numbers say nothing.
+  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return "<div>Approved</div>";
   const lines = [`<div>${p.for} of ${threshold} for, ${p.against} against</div>`];
   if (who("for")) lines.push(`<div class="muted">For: ${who("for")}</div>`);
   if (who("against")) lines.push(`<div class="muted">Against: ${who("against")}</div>`);
@@ -315,27 +383,28 @@ export function renderHtml(data: DashData, cfg: Config, serverUrl = "https://git
   const over = cfg.dashboard.collapse_over;
   const closed = over > 0 && data.overview.all.total > over;
   const known = { statuses: ORDER as string[], horizons: data.overview.horizons, tops: data.overview.rows.map((r) => r.id) };
-  const proposals = data.proposals.length
-    ? `<table><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead><tbody>${data.proposals
-        .map(
-          (p) =>
-            `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}</div><div>${p.nodes
-              .map((n) => `<code>${esc(n)}</code>`)
-              .join(" ")}</div></td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
-              p,
-              data.threshold,
-            )}</td><td>${renderNext(p)}</td></tr>`,
-        )
-        .join("")}</tbody></table>`
-    : `<p class="muted">No open spec pull requests.</p>`;
+  const proposals = renderQueue(data);
+  const fresh = !data.tree.length && !data.proposals.length;
   const tree = data.tree.length
     ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root, closed)).join("")}</ul>`
-    : `<p class="muted">No specs yet. Add the first one under <code>${esc(cfg.root)}/</code>.</p>`;
+    : `<div class="empty"><p><strong>No specs yet.</strong> A spec is a file, <code>${esc(cfg.root)}/&lt;name&gt;/spec.md</code>, that says what one part of the project does and names the tests that prove it. Add the first one in a pull request.</p><p>To check the tree on your machine:</p><pre>npx github:beamreach-ai/spectree validate
+npx github:beamreach-ai/spectree tree</pre></div>`;
   const against = data.max_against === 0 ? "none against" : `at most ${data.max_against} against`;
-  const intro = `Every change to ${esc(name)} starts as a spec under <code>${esc(cfg.root)}/</code>, proposed in a pull request. People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
+  const intro = `<details class="how" id="how" open><summary>How changes are made here</summary><ol class="steps"><li><strong>Propose.</strong> Every change to ${esc(
+    name,
+  )} starts as a spec under <code>${esc(cfg.root)}/</code>, proposed in a pull request.</li><li><strong>Vote.</strong> People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
     data.threshold,
     "weighted vote",
-  )} for and ${against}. People with write access weigh 1, and everyone else's vote is shown. After the vote, the code is added to the same pull request and spec and code merge together. <a href="${CONTRIBUTING}">How to propose a spec and vote</a>.`;
+  )} for and ${against}. People with write access weigh 1, and everyone else's vote is shown.</li><li><strong>Build.</strong> After the vote, the code is added to the same pull request and spec and code merge together.</li></ol><p class="muted"><a href="${CONTRIBUTING}">How to propose a spec and vote</a>.</p></details>`;
+  // Remembers, in this browser only, that the visitor closed the steps.
+  const howScript = `(function () {
+  var how = document.getElementById("how");
+  if (!how) return;
+  try {
+    if (localStorage.getItem("spectree-how") === "closed") how.open = false;
+    how.addEventListener("toggle", function () { localStorage.setItem("spectree-how", how.open ? "open" : "closed"); });
+  } catch (e) {}
+})();`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -355,7 +424,17 @@ h1{font-size:28px;margin:0 0 4px}
 h2{font-size:18px;margin:36px 0 12px}
 a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .muted{color:var(--muted);font-size:14px}
-.intro{max-width:720px;margin:12px 0 0}
+.how{margin:16px 0 0}.how>summary{font-weight:600;font-size:14px;color:var(--muted)}.how>summary::before{content:"▸ "}.how[open]>summary::before{content:"▾ "}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:10px 0 6px;padding:0;list-style:none;counter-reset:step}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px}
+.how p{margin:0}
+@media (max-width:720px){.steps{grid-template-columns:1fr}}
+.empty pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.queue .step th{padding-top:16px;font-size:14px;color:var(--fg);border-bottom:1px solid var(--line)}.queue tbody:first-of-type .step th{padding-top:6px}
+.specs summary{font-size:14px;color:var(--muted)}.specs summary::before{content:"▸ "}.specs[open] summary::before{content:"▾ "}
+.hz{color:var(--muted);background:var(--line)}.hz::before{content:"● ";font-size:10px;vertical-align:1px}
+.hz-now{color:var(--done);background:var(--done-bg)}.hz-next{color:var(--appr);background:var(--appr-bg)}.hz-later{color:var(--muted);background:var(--line)}.hz-other{color:var(--prog);background:var(--prog-bg)}
+.where{margin:4px 0}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .pill.done{color:var(--done);background:var(--done-bg)}.pill.in_progress{color:var(--prog);background:var(--prog-bg)}
@@ -382,7 +461,10 @@ td:first-child{width:38%}td:last-child{width:32%}
 .next{font-weight:600}
 ul{list-style:none;margin:0;padding:0}
 .tree ul{margin-left:4px;padding-left:16px;border-left:1px solid var(--line)}
-.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:7px 0}
+.row{display:flex;align-items:center;gap:6px 8px;padding:7px 0}.row>*{flex:none}
+.row .title{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .bar{width:56px;margin-right:0}
+@media (max-width:640px){.row{flex-wrap:wrap}.row .title{flex-basis:100%}}
 .row.plain{padding-left:15px}
 summary{cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}
 summary.row::before{content:"";width:0;height:0;margin-right:2px;border-left:5px solid var(--muted);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
@@ -395,23 +477,22 @@ details[open]>summary.row::before{transform:rotate(90deg)}
 .criteria{margin:6px 0;padding-left:20px}.criteria li{margin:4px 0}.criteria .muted{display:block;font-size:13px}
 footer{margin-top:40px}
 @media (max-width:640px){table:not(.overview),table:not(.overview) tbody,table:not(.overview) tr,table:not(.overview) td{display:block}table:not(.overview) thead{display:none}table:not(.overview){min-width:0}
-table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) tr{padding:10px 0;border-bottom:1px solid var(--line)}table:not(.overview) tr:last-child{border-bottom:0}}
+table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) tr{padding:10px 0;border-bottom:1px solid var(--line)}table:not(.overview) tr:last-child{border-bottom:0}}
 </style>
 </head>
 <body>
 <main>
 <h1>${esc(name)} roadmap</h1>
 <div class="muted"><a href="${repoUrl}">${esc(data.repository)}</a></div>
-<p class="intro">${intro}</p>
+${intro}
 ${renderOverview(data.overview, first)}
-<h2>Open proposals</h2>
-<div class="box">${proposals}</div>
+${fresh ? "" : `<h2>Open proposals</h2>\n<div class="box">${proposals}</div>`}
 <h2 id="specs">Specs</h2>
 ${renderFind(data)}
 <div class="box">${tree}</div>
 <footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
-${data.tree.length ? `<script>\n${findScript(known)}\n</script>` : ""}
+${data.tree.length ? `<script>\n${findScript(known)}\n${howScript}\n</script>` : ""}
 </body>
 </html>
 `;
