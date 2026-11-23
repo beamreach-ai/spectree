@@ -9201,6 +9201,10 @@ var GitHub = class {
   /** Issues, open and closed, that carry a label. Pull requests are left out. */
   issuesLabeled = async (label) => (await this.all(`/issues?state=all&labels=${encodeURIComponent(label)}`)).filter((i) => !i.pull_request);
   issue = (n) => this.get(`/issues/${n}`);
+  /** Commits on a branch that touch a path, newest first, since a time. */
+  commitsSince = (path, since, branch) => this.all(`/commits?sha=${encodeURIComponent(branch)}&path=${encodeURIComponent(path)}&since=${encodeURIComponent(since)}`);
+  commit = (sha) => this.get(`/commits/${sha}`);
+  addReaction = (commentId, content) => this.write("POST", `/issues/comments/${commentId}/reactions`, { content });
   /** Creates the label when the repository does not have it. */
   async ensureLabel(name, color, description) {
     const r = await this.call("GET", `/labels/${encodeURIComponent(name)}`);
@@ -9249,6 +9253,56 @@ var GitHub = class {
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
 
+// src/commands.ts
+var COMMANDS = ["for", "against", "withdraw", "take", "status"];
+function parseCommand(body) {
+  const first = body.replace(/^\s+/, "").split(/\r?\n/)[0];
+  const m = /^\/spectree(?:\s+(\S+)(.*))?$/i.exec(first.trim());
+  if (!m) return null;
+  const word = (m[1] ?? "").toLowerCase();
+  const name = COMMANDS.includes(word) ? word : "unknown";
+  return { name, arg: (m[2] ?? "").trim() };
+}
+var commandRef = (id) => `comment:${id}`;
+function commandReviews(comments) {
+  const state = { for: "APPROVED", against: "CHANGES_REQUESTED", withdraw: "DISMISSED" };
+  const out = [];
+  for (const c of comments) {
+    const cmd = parseCommand(c.body);
+    if (cmd && state[cmd.name]) out.push({ user: c.user, state: state[cmd.name], commit: commandRef(c.id), at: c.at });
+  }
+  return out;
+}
+function sawDigest(seen, digest, now, keep = 20) {
+  if (seen[digest]) return seen;
+  const entries = [...Object.entries(seen), [digest, now]];
+  return Object.fromEntries(entries.slice(-keep));
+}
+function countsNow(c, seen, digest) {
+  const first = seen[digest];
+  return first !== void 0 && Date.parse(c.at) >= Date.parse(first);
+}
+function takenBy(comments) {
+  let who = "";
+  for (const c of [...comments].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) {
+    const cmd = parseCommand(c.body);
+    if (cmd?.name === "take") who = c.user;
+    else if (cmd?.name === "withdraw" && c.user.toLowerCase() === who.toLowerCase()) who = "";
+  }
+  return who;
+}
+var HELP = [
+  "Commands, as the first line of a comment on a spec pull request:",
+  "",
+  "| Comment | Effect |",
+  "|---|---|",
+  "| `/spectree for` | a vote for, the same as an approving review |",
+  '| `/spectree against <reason>` | a vote against, the same as "Request changes" |',
+  "| `/spectree withdraw` | takes your vote back |",
+  "| `/spectree take` | says you will write the code of an approved spec |",
+  "| `/spectree status` | asks for the tally and what the pull request waits for |"
+].join("\n");
+
 // src/config.ts
 var import_yaml = __toESM(require_dist(), 1);
 var DEFAULTS = {
@@ -9263,7 +9317,7 @@ var DEFAULTS = {
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
   demand: { enabled: true, top: 3 },
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30 }
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 }
 };
 function loadConfig(text) {
   const errors = [];
@@ -9336,7 +9390,7 @@ function loadConfig(text) {
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== void 0) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
@@ -9344,6 +9398,10 @@ function loadConfig(text) {
           if (d.collapse_over !== void 0) {
             if (typeof d.collapse_over === "number" && Number.isInteger(d.collapse_over) && d.collapse_over >= 0) config.dashboard.collapse_over = d.collapse_over;
             else errors.push("dashboard.collapse_over must be a whole number, 0 or more");
+          }
+          if (d.recent_days !== void 0) {
+            if (typeof d.recent_days === "number" && Number.isInteger(d.recent_days) && d.recent_days >= 0) config.dashboard.recent_days = d.recent_days;
+            else errors.push("dashboard.recent_days must be a whole number, 0 or more");
           }
           if (d.stale_days !== void 0) {
             if (typeof d.stale_days === "number" && Number.isInteger(d.stale_days) && d.stale_days >= 0) config.dashboard.stale_days = d.stale_days;
@@ -9703,6 +9761,29 @@ function overviewOf(roots) {
   );
   return { horizons, rows, all };
 }
+function recentOf(flat, proposals, merges, cfg, now) {
+  const window = cfg.dashboard.recent_days;
+  if (!merges || window <= 0) return { recent: null, pace: null };
+  const within = (at, days2) => at !== "" && Date.parse(now) - Date.parse(at) <= days2 * 864e5;
+  const recent = [];
+  const pace = { d30: 0, d90: 0 };
+  for (const m of merges) {
+    const now_ = (status) => m.added.filter((id) => flat.get(id)?.kind === "leaf" && flat.get(id).status === status);
+    const done = [.../* @__PURE__ */ new Set([...now_("done"), ...m.built.filter((id) => flat.get(id)?.status === "done")])];
+    if (within(m.at, 30)) pace.d30 += done.length;
+    if (within(m.at, 90)) pace.d90 += done.length;
+    if (!within(m.at, window)) continue;
+    for (const [kind, ids] of [["done", done], ["planned", now_("planned")]])
+      if (ids.length) recent.push({ kind, at: m.at, title: ids.length === 1 ? flat.get(ids[0]).title : m.title, url: m.url, ids });
+  }
+  for (const p of proposals) {
+    const past = p.next !== "votes" && p.next !== "fix";
+    const at = past ? p.since : p.opened;
+    if (within(at, window)) recent.push({ kind: past ? "approved" : "proposed", at, title: p.title, url: p.url, ids: p.nodes });
+  }
+  recent.sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || (a.title < b.title ? -1 : 1));
+  return { recent, pace };
+}
 function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
   const flat = /* @__PURE__ */ new Map();
   const make = (id, title, kind, status, body, criteria, horizon = "") => ({
@@ -9741,6 +9822,7 @@ function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
       days: daysSince(opened),
       days_in_step: daysSince(since),
       stale,
+      taken_by: p.taken ?? "",
       number: p.number,
       title: p.title,
       author: p.author,
@@ -9789,7 +9871,7 @@ function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
     wanted.sort((a, b) => b.up - a.up || (a.id < b.id ? -1 : 1));
     wanted.length = Math.min(wanted.length, cfg.demand.top);
   }
-  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, proposals, overview: overviewOf(roots), tree: roots };
+  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, ...recentOf(flat, proposals, extra.merges, cfg, now), proposals, overview: overviewOf(roots), tree: roots };
 }
 var esc2 = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 var inline = (s) => esc2(s).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -9834,11 +9916,26 @@ function renderSpecs(nodes) {
   const where = shared ? ` in <code>${esc2(parts[0].slice(0, shared).join("/"))}</code>` : "";
   return `<details class="specs"><summary>${nodes.length} specs${where}</summary>${codes}</details>`;
 }
+var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var RECENT_SHOWN = 8;
+function renderRecent(data, window) {
+  if (!data.recent || !data.pace) return "";
+  const pace = `Specs done: ${data.pace.d30} in the last 30 days, ${data.pace.d90} in the last 90.`;
+  if (!data.recent.length) return `<h2>Lately</h2>
+<p class="muted">Nothing changed in the last ${plural(window, "day")}. ${pace}</p>`;
+  const line = (e) => {
+    const d = new Date(e.at);
+    return `<li><span class="muted when">${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}</span> ${pill(e.kind)} <a href="${esc2(e.url)}">${esc2(e.title)}</a>${e.ids.length > 1 ? ` <span class="muted">${e.ids.length} specs</span>` : ""}</li>`;
+  };
+  const more = data.recent.length - RECENT_SHOWN;
+  return `<h2>Lately</h2>
+<ul class="recent">${data.recent.slice(0, RECENT_SHOWN).map(line).join("")}</ul><p class="muted">${more > 0 ? `And ${more} more in the last ${plural(window, "day")}. ` : ""}${pace}</p>`;
+}
 function renderQueue(data) {
   if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
   const row = (p) => {
     const age = p.opened ? ` \xB7 opened ${p.days ? days(p.days) + " ago" : "today"}${p.days_in_step !== p.days ? ` \xB7 ${p.days_in_step ? days(p.days_in_step) : "since today"} in this step` : ""}` : "";
-    return `<tr><td><a href="${p.url}">#${p.number} ${esc2(p.title)}</a><div class="muted">by ${esc2(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
+    return `<tr><td><a href="${p.url}">#${p.number} ${esc2(p.title)}</a><div class="muted">by ${esc2(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}${p.taken_by && p.next === "code" ? `<div class="muted">Taken by @${esc2(p.taken_by)}</div>` : ""}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
       p,
       data.threshold
     )}</td><td>${renderNext(p)}</td></tr>`;
@@ -9941,7 +10038,7 @@ function renderVotes(p, threshold) {
 function renderNext(p) {
   const hint = {
     fix: "The spec has problems. The vote starts when it is valid.",
-    votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against.`,
+    votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
     code: "The spec is approved and frozen. The code goes in this pull request, or in another with <code>Implements: #" + p.number + "</code>.",
     review: "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge."
@@ -10017,6 +10114,7 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .where{margin:4px 0}
 .button{display:inline-block;padding:6px 14px;border-radius:8px;background:var(--link);color:var(--bg);font-weight:600;font-size:15px}.button:hover{text-decoration:none;opacity:.9}
 .want{font-size:13px;white-space:nowrap}
+.recent li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:4px 0}.recent .when{min-width:52px}
 .wanted{margin:0;padding-left:24px;list-style:decimal}.wanted li{margin:4px 0}
 .actions{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}.actions a{font-weight:600}
 .stands{margin:8px 0 4px}
@@ -10078,6 +10176,7 @@ table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:aut
 ${intro}
 ${wanted}
 ${renderOverview(data.overview, first)}
+${renderRecent(data, cfg.dashboard.recent_days)}
 ${fresh ? "" : `<h2>Open proposals</h2>
 <div class="box">${proposals}</div>`}
 <h2 id="specs">Specs</h2>
@@ -10314,6 +10413,7 @@ function evaluatePr(input, cfg) {
 var CONFIG_FILE = ".spectree.yml";
 var MARKER = "<!-- spectree -->";
 var RECORD = /<!-- spectree-record: (.*?) -->/s;
+var SEEN = /<!-- spectree-seen: (.*?) -->/s;
 var CONTEXTS = { spec: "spectree/spec", phase: "spectree/phase", scope: "spectree/scope" };
 var SKIP = /* @__PURE__ */ new Set([".git", "node_modules"]);
 function listFiles(dir, limit = 2e5) {
@@ -10364,11 +10464,23 @@ function recordIn(comments, bot) {
       record = null;
     }
   }
-  return { id: c.id, body: c.body, record };
+  let seen = {};
+  try {
+    const s = SEEN.exec(c.body);
+    if (s) seen = JSON.parse(s[1]);
+  } catch {
+    seen = {};
+  }
+  return { id: c.id, body: c.body, record, seen };
 }
-function commentBody(r) {
+function commentBody(r, seen) {
   if (r.comment === null) return null;
-  return [MARKER, r.comment, ...r.record ? ["", `<!-- spectree-record: ${JSON.stringify(r.record)} -->`] : []].join("\n");
+  return [
+    MARKER,
+    r.comment,
+    ...r.record ? ["", `<!-- spectree-record: ${JSON.stringify(r.record)} -->`] : [],
+    ...Object.keys(seen).length ? [`<!-- spectree-seen: ${JSON.stringify(seen)} -->`] : []
+  ].join("\n");
 }
 async function run(o) {
   const cfgFile = (0, import_node_path.join)(o.workspace, CONFIG_FILE);
@@ -10400,7 +10512,19 @@ async function run(o) {
       const specContents = {};
       const weights = {};
       let implementsRecord = null;
+      const commands = comments.filter((c) => c.user?.login && c.user.login !== o.bot && typeof c.body === "string" && parseCommand(c.body)).map((c) => ({
+        id: c.id,
+        user: c.user.login,
+        body: c.body,
+        at: c.updated_at ?? c.created_at ?? o.now,
+        acked: (c.reactions?.eyes ?? 0) > 0 || (c.reactions?.confused ?? 0) > 0
+      }));
+      let seen = own?.seen ?? {};
+      const counted = /* @__PURE__ */ new Set();
       if (touchesRoot) {
+        const digest = specDigest(files.filter((f) => f.path.startsWith(cfg.root + "/")));
+        seen = sawDigest(seen, digest, o.now);
+        for (const c of commands) if (specUnchangedSince[commandRef(c.id)] = countsNow(c, seen, digest)) counted.add(c.id);
         reviews = (await o.gh.reviews(n)).filter((r) => r.user?.login && r.submitted_at).map((r) => ({ user: r.user.login, state: r.state, commit: r.commit_id, at: r.submitted_at }));
         const headTree = await o.gh.dirTreeSha(head, cfg.root);
         for (const c of new Set(reviews.map((r) => r.commit)))
@@ -10410,6 +10534,7 @@ async function run(o) {
             const text = await o.gh.fileAt(f.path, `refs/pull/${n}/head`);
             if (text !== null) specContents[f.path] = text;
           }
+        reviews.push(...commandReviews(commands));
         for (const u of /* @__PURE__ */ new Set([author, ...reviews.map((r) => r.user)])) weights[u.toLowerCase()] = weightOf(u, await writer(u), cfg);
         const ref = implementsRef(pull.body ?? "");
         if (ref && ref !== n) implementsRecord = recordIn(await o.gh.comments(ref), o.bot)?.record ?? null;
@@ -10441,7 +10566,7 @@ async function run(o) {
         const last = existing.find((e) => e.context === CONTEXTS[key]);
         if (!last || last.state !== s.state || last.description !== s.description.slice(0, 140)) await o.gh.setStatus(head, CONTEXTS[key], s.state, s.description, pull.html_url);
       }
-      const body = commentBody(result);
+      const body = commentBody(result, touchesRoot ? seen : {});
       if (body !== null) {
         if (!own) await o.gh.addComment(n, body);
         else if (own.body !== body) await o.gh.updateComment(own.id, body);
@@ -10449,6 +10574,27 @@ async function run(o) {
       if (result.addLabel) await o.gh.addLabel(n, LABEL_APPROVED);
       if (result.removeLabel) await o.gh.removeLabel(n, LABEL_APPROVED);
       if (result.close) await o.gh.closePull(n);
+      for (const c of touchesRoot ? commands.filter((x) => !x.acked) : []) {
+        const cmd = parseCommand(c.body);
+        try {
+          if (cmd.name === "unknown") {
+            await o.gh.addComment(n, `@${c.user} that is not a command spectree knows.
+
+${HELP}`);
+            await o.gh.addReaction(c.id, "confused");
+          } else if (cmd.name === "status") {
+            const s = result.statuses;
+            await o.gh.addComment(n, `@${c.user} where #${n} stands:
+
+- Spec: ${s.spec.description}
+- Phase: ${s.phase.description}
+- Scope: ${s.scope.description}`);
+            await o.gh.addReaction(c.id, "eyes");
+          } else if (cmd.name === "take" || cmd.name === "withdraw" || counted.has(c.id)) await o.gh.addReaction(c.id, "eyes");
+        } catch (e) {
+          o.log(`::warning::#${n}: the command in comment ${c.id} could not be answered: ${e.message}`);
+        }
+      }
       o.log(`#${n} ${result.phase}: spec ${result.statuses.spec.state}, phase ${result.statuses.phase.state}, scope ${result.statuses.scope.state}`);
       if (cfg.demand.enabled && cfg.dashboard.enabled && touchesRoot) {
         try {
@@ -10457,7 +10603,7 @@ async function run(o) {
           o.log(`::warning::#${n}: demand could not be read: ${e.message}`);
         }
       }
-      summaries.push({ number: n, title: pull.title, author, url: pull.html_url, opened: pull.created_at ?? "", result });
+      summaries.push({ number: n, title: pull.title, author, url: pull.html_url, opened: pull.created_at ?? "", taken: touchesRoot ? takenBy(commands) : "", result });
     } catch (e) {
       failed++;
       o.log(`::error::#${n}: ${e.message}`);
@@ -10475,6 +10621,29 @@ async function run(o) {
         }
       } catch (e) {
         o.log(`::warning::demand could not be read: ${e.message}`);
+      }
+    }
+    const days2 = Math.max(90, cfg.dashboard.recent_days);
+    if (cfg.dashboard.recent_days > 0) {
+      try {
+        const merges = [];
+        const since = new Date(Date.parse(o.now) - days2 * 864e5).toISOString();
+        for (const c of (await o.gh.commitsSince(cfg.root, since, o.defaultBranch)).slice(0, 60)) {
+          const full = await o.gh.commit(c.sha);
+          const added = [];
+          const built = [];
+          for (const f of full.files ?? []) {
+            if (!isSpecFile(cfg.root, f.filename)) continue;
+            const id = f.filename.slice(cfg.root.length + 1, -SPEC_FILE.length - 1);
+            if (f.status === "added") added.push(id);
+            else if (f.status === "modified" && /^-planned:/m.test(f.patch ?? "") && !/^\+planned:/m.test(f.patch ?? "")) built.push(id);
+          }
+          if (added.length || built.length)
+            merges.push({ sha: c.sha, at: full.commit?.committer?.date ?? "", title: String(full.commit?.message ?? "").split("\n")[0], url: full.html_url ?? "", added, built });
+        }
+        extra.merges = merges;
+      } catch (e) {
+        o.log(`::warning::recent changes could not be read: ${e.message}`);
       }
     }
     const data = buildData(main2.specs, summaries, cfg, `${o.gh.owner}/${o.gh.repo}`, o.now, extra);

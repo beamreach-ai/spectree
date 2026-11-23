@@ -7379,7 +7379,7 @@ var DEFAULTS = {
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
   demand: { enabled: true, top: 3 },
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30 }
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 }
 };
 function loadConfig(text) {
   const errors = [];
@@ -7452,7 +7452,7 @@ function loadConfig(text) {
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== void 0) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
@@ -7460,6 +7460,10 @@ function loadConfig(text) {
           if (d.collapse_over !== void 0) {
             if (typeof d.collapse_over === "number" && Number.isInteger(d.collapse_over) && d.collapse_over >= 0) config.dashboard.collapse_over = d.collapse_over;
             else errors.push("dashboard.collapse_over must be a whole number, 0 or more");
+          }
+          if (d.recent_days !== void 0) {
+            if (typeof d.recent_days === "number" && Number.isInteger(d.recent_days) && d.recent_days >= 0) config.dashboard.recent_days = d.recent_days;
+            else errors.push("dashboard.recent_days must be a whole number, 0 or more");
           }
           if (d.stale_days !== void 0) {
             if (typeof d.stale_days === "number" && Number.isInteger(d.stale_days) && d.stale_days >= 0) config.dashboard.stale_days = d.stale_days;
@@ -7808,6 +7812,29 @@ function overviewOf(roots) {
   );
   return { horizons, rows, all };
 }
+function recentOf(flat, proposals, merges, cfg, now) {
+  const window = cfg.dashboard.recent_days;
+  if (!merges || window <= 0) return { recent: null, pace: null };
+  const within = (at, days2) => at !== "" && Date.parse(now) - Date.parse(at) <= days2 * 864e5;
+  const recent = [];
+  const pace = { d30: 0, d90: 0 };
+  for (const m of merges) {
+    const now_ = (status) => m.added.filter((id) => flat.get(id)?.kind === "leaf" && flat.get(id).status === status);
+    const done = [.../* @__PURE__ */ new Set([...now_("done"), ...m.built.filter((id) => flat.get(id)?.status === "done")])];
+    if (within(m.at, 30)) pace.d30 += done.length;
+    if (within(m.at, 90)) pace.d90 += done.length;
+    if (!within(m.at, window)) continue;
+    for (const [kind, ids] of [["done", done], ["planned", now_("planned")]])
+      if (ids.length) recent.push({ kind, at: m.at, title: ids.length === 1 ? flat.get(ids[0]).title : m.title, url: m.url, ids });
+  }
+  for (const p of proposals) {
+    const past = p.next !== "votes" && p.next !== "fix";
+    const at = past ? p.since : p.opened;
+    if (within(at, window)) recent.push({ kind: past ? "approved" : "proposed", at, title: p.title, url: p.url, ids: p.nodes });
+  }
+  recent.sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || (a.title < b.title ? -1 : 1));
+  return { recent, pace };
+}
 function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
   const flat = /* @__PURE__ */ new Map();
   const make = (id, title, kind, status, body, criteria, horizon = "") => ({
@@ -7846,6 +7873,7 @@ function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
       days: daysSince(opened),
       days_in_step: daysSince(since),
       stale,
+      taken_by: p.taken ?? "",
       number: p.number,
       title: p.title,
       author: p.author,
@@ -7894,7 +7922,7 @@ function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
     wanted.sort((a, b) => b.up - a.up || (a.id < b.id ? -1 : 1));
     wanted.length = Math.min(wanted.length, cfg.demand.top);
   }
-  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, proposals, overview: overviewOf(roots), tree: roots };
+  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, ...recentOf(flat, proposals, extra.merges, cfg, now), proposals, overview: overviewOf(roots), tree: roots };
 }
 var esc2 = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 var inline = (s) => esc2(s).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -7939,11 +7967,26 @@ function renderSpecs(nodes) {
   const where = shared ? ` in <code>${esc2(parts[0].slice(0, shared).join("/"))}</code>` : "";
   return `<details class="specs"><summary>${nodes.length} specs${where}</summary>${codes}</details>`;
 }
+var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var RECENT_SHOWN = 8;
+function renderRecent(data, window) {
+  if (!data.recent || !data.pace) return "";
+  const pace = `Specs done: ${data.pace.d30} in the last 30 days, ${data.pace.d90} in the last 90.`;
+  if (!data.recent.length) return `<h2>Lately</h2>
+<p class="muted">Nothing changed in the last ${plural(window, "day")}. ${pace}</p>`;
+  const line = (e) => {
+    const d = new Date(e.at);
+    return `<li><span class="muted when">${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}</span> ${pill(e.kind)} <a href="${esc2(e.url)}">${esc2(e.title)}</a>${e.ids.length > 1 ? ` <span class="muted">${e.ids.length} specs</span>` : ""}</li>`;
+  };
+  const more = data.recent.length - RECENT_SHOWN;
+  return `<h2>Lately</h2>
+<ul class="recent">${data.recent.slice(0, RECENT_SHOWN).map(line).join("")}</ul><p class="muted">${more > 0 ? `And ${more} more in the last ${plural(window, "day")}. ` : ""}${pace}</p>`;
+}
 function renderQueue(data) {
   if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
   const row = (p) => {
     const age = p.opened ? ` \xB7 opened ${p.days ? days(p.days) + " ago" : "today"}${p.days_in_step !== p.days ? ` \xB7 ${p.days_in_step ? days(p.days_in_step) : "since today"} in this step` : ""}` : "";
-    return `<tr><td><a href="${p.url}">#${p.number} ${esc2(p.title)}</a><div class="muted">by ${esc2(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
+    return `<tr><td><a href="${p.url}">#${p.number} ${esc2(p.title)}</a><div class="muted">by ${esc2(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}${p.taken_by && p.next === "code" ? `<div class="muted">Taken by @${esc2(p.taken_by)}</div>` : ""}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
       p,
       data.threshold
     )}</td><td>${renderNext(p)}</td></tr>`;
@@ -8046,7 +8089,7 @@ function renderVotes(p, threshold) {
 function renderNext(p) {
   const hint = {
     fix: "The spec has problems. The vote starts when it is valid.",
-    votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against.`,
+    votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
     code: "The spec is approved and frozen. The code goes in this pull request, or in another with <code>Implements: #" + p.number + "</code>.",
     review: "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge."
@@ -8122,6 +8165,7 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .where{margin:4px 0}
 .button{display:inline-block;padding:6px 14px;border-radius:8px;background:var(--link);color:var(--bg);font-weight:600;font-size:15px}.button:hover{text-decoration:none;opacity:.9}
 .want{font-size:13px;white-space:nowrap}
+.recent li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:4px 0}.recent .when{min-width:52px}
 .wanted{margin:0;padding-left:24px;list-style:decimal}.wanted li{margin:4px 0}
 .actions{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}.actions a{font-weight:600}
 .stands{margin:8px 0 4px}
@@ -8183,6 +8227,7 @@ table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:aut
 ${intro}
 ${wanted}
 ${renderOverview(data.overview, first)}
+${renderRecent(data, cfg.dashboard.recent_days)}
 ${fresh ? "" : `<h2>Open proposals</h2>
 <div class="box">${proposals}</div>`}
 <h2 id="specs">Specs</h2>
@@ -8202,6 +8247,21 @@ ${howScript}
 // src/run.ts
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
+
+// src/commands.ts
+var HELP = [
+  "Commands, as the first line of a comment on a spec pull request:",
+  "",
+  "| Comment | Effect |",
+  "|---|---|",
+  "| `/spectree for` | a vote for, the same as an approving review |",
+  '| `/spectree against <reason>` | a vote against, the same as "Request changes" |',
+  "| `/spectree withdraw` | takes your vote back |",
+  "| `/spectree take` | says you will write the code of an approved spec |",
+  "| `/spectree status` | asks for the tally and what the pull request waits for |"
+].join("\n");
+
+// src/run.ts
 var CONFIG_FILE = ".spectree.yml";
 function readSpecs(dir, cfg) {
   const specs = {};
@@ -8263,6 +8323,9 @@ var signal = `name: Spectree signal
 on:
   pull_request_review:
     types: [submitted, edited, dismissed]
+  # A comment can be a command, such as "/spectree for".
+  issue_comment:
+    types: [created, edited]
 
 permissions: {}
 
@@ -8270,7 +8333,7 @@ jobs:
   signal:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "A review was recorded."
+      - run: echo "A review or a comment was recorded."
 `;
 function defaultBranch(dir) {
   try {
