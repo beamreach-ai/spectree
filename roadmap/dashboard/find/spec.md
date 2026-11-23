@@ -5,6 +5,7 @@ paths:
   - src/find.ts
   - src/config.ts
   - test/find.test.ts
+  - test/overview.test.ts
   - dist/**
 criteria:
   - id: search
@@ -99,7 +100,7 @@ Each number in the overview becomes a link to the tree narrowed to what it count
 - `renderNode` adds `data-kind`, `data-status`, `data-horizon` and `data-text` to each node's `<li>`; `data-text` is the title, the id and the summary in lower case. It renders groups closed when the leaves outnumber the setting.
 - `renderHtml` renders the bar with the attribute `hidden`, and the overview's links.
 - `src/config.ts` reads `dashboard.collapse_over`.
-- The tests are in a new file, `test/find.test.ts`. They cover the four functions, the attributes and links in the page, and the setting. The few lines that connect the controls to the functions run only in a browser and are checked by hand with `spectree preview` before the pull request is ready.
+- The tests are in a new file, `test/find.test.ts`. They cover the four functions, the attributes and links in the page, and the setting. Two tests in `test/overview.test.ts` are loosened: they compared a node's whole opening tag and searched the whole page for the word Planned, and both now hold more. The few lines that connect the controls to the functions run only in a browser and are checked by hand with `spectree preview` before the pull request is ready.
 
 ## Not in this spec
 

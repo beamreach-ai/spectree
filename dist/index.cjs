@@ -9254,7 +9254,7 @@ var DEFAULTS = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "" }
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40 }
 };
 function loadConfig(text) {
   const errors = [];
@@ -9312,10 +9312,14 @@ function loadConfig(text) {
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== void 0) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
+          }
+          if (d.collapse_over !== void 0) {
+            if (typeof d.collapse_over === "number" && Number.isInteger(d.collapse_over) && d.collapse_over >= 0) config.dashboard.collapse_over = d.collapse_over;
+            else errors.push("dashboard.collapse_over must be a whole number, 0 or more");
           }
           if (d.project !== void 0) {
             if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;
@@ -9330,6 +9334,113 @@ function loadConfig(text) {
     }
   }
   return { config, errors };
+}
+
+// src/find.ts
+function parseView(query, known) {
+  const p = new URLSearchParams(query);
+  const pick = (key, list2) => {
+    const v = p.get(key);
+    return v !== null && list2.includes(v) ? v : null;
+  };
+  return { q: p.get("q") ?? "", status: pick("status", known.statuses) ?? "", horizon: pick("horizon", known.horizons), top: pick("top", known.tops) ?? "" };
+}
+function writeView(view) {
+  const p = new URLSearchParams();
+  if (view.q.trim()) p.set("q", view.q);
+  if (view.status) p.set("status", view.status);
+  if (view.horizon !== null) p.set("horizon", view.horizon);
+  if (view.top) p.set("top", view.top);
+  return p.toString();
+}
+function matches(node, view) {
+  for (const word of view.q.toLowerCase().split(/\s+/)) if (word && !node.text.includes(word)) return false;
+  if (view.status && node.status !== view.status) return false;
+  if (view.horizon !== null && !(node.status === "planned" && node.horizon === view.horizon)) return false;
+  if (view.top && node.id !== view.top && !node.id.startsWith(view.top + "/")) return false;
+  return true;
+}
+function visible(nodes, view, anchor) {
+  const ids = new Set(nodes.map((n) => n.id));
+  const above = (id) => {
+    const out = [];
+    for (let i = id.lastIndexOf("/"); i > 0; i = id.lastIndexOf("/", i - 1)) if (ids.has(id.slice(0, i))) out.push(id.slice(0, i));
+    return out;
+  };
+  const active = view.q.trim() !== "" || view.status !== "" || view.horizon !== null || view.top !== "";
+  const leaves = nodes.filter((n) => n.kind === "leaf");
+  const hits = active ? leaves.filter((n) => matches(n, view)) : leaves;
+  const show = new Set(active ? [] : ids);
+  const open = /* @__PURE__ */ new Set();
+  if (active)
+    for (const n of hits) {
+      show.add(n.id);
+      for (const a of above(n.id)) show.add(a), open.add(a);
+    }
+  if (anchor && ids.has(anchor)) {
+    show.add(anchor);
+    for (const a of above(anchor)) show.add(a), open.add(a);
+  }
+  const label = !active ? "" : hits.length ? `${hits.length} of ${leaves.length} ${leaves.length === 1 ? "spec" : "specs"}` : "No specs match.";
+  return { active, show: [...show], open: [...open], matched: hits.length, total: leaves.length, label };
+}
+function findScript(known) {
+  const json = JSON.stringify(known).replace(/</g, "\\u003c");
+  return `${parseView.toString()}
+${writeView.toString()}
+${matches.toString()}
+${visible.toString()}
+(function (parseView, writeView, visible) {
+  var form = document.getElementById("find");
+  if (!form) return;
+  var KNOWN = ${json};
+  var count = document.getElementById("find-count"), clear = document.getElementById("find-clear");
+  var nodes = [].map.call(document.querySelectorAll("li.node"), function (li) {
+    var d = li.querySelector(":scope > details");
+    return { id: li.id.slice(5), kind: li.dataset.kind, status: li.dataset.status, horizon: li.dataset.horizon, text: li.dataset.text, li: li, details: d, was: d ? d.open : false };
+  });
+  function anchor() {
+    var h = decodeURIComponent(location.hash.slice(1));
+    return h.indexOf("spec-") === 0 ? h.slice(5) : "";
+  }
+  function read() {
+    var h = form.elements.horizon ? form.elements.horizon.value : "";
+    return { q: form.elements.q.value, status: form.elements.status.value, horizon: h ? h.slice(2) : null, top: form.elements.top.value };
+  }
+  function fill(v) {
+    form.elements.q.value = v.q;
+    form.elements.status.value = v.status;
+    form.elements.top.value = v.top;
+    if (form.elements.horizon) form.elements.horizon.value = v.horizon === null ? "" : "h:" + v.horizon;
+  }
+  function apply(v) {
+    var r = visible(nodes, v, anchor()), show = new Set(r.show), open = new Set(r.open);
+    nodes.forEach(function (n) {
+      n.li.hidden = !show.has(n.id);
+      if (n.details) n.details.open = open.has(n.id) || (!r.active && n.was);
+    });
+    count.textContent = r.label;
+    clear.hidden = !r.active;
+  }
+  function changed() {
+    var v = read(), s = writeView(v);
+    history.replaceState(null, "", location.pathname + (s ? "?" + s : "") + location.hash);
+    apply(v);
+  }
+  function jump() {
+    var a = anchor(), n = a && document.getElementById("spec-" + a);
+    if (n) n.scrollIntoView();
+  }
+  form.hidden = false;
+  form.addEventListener("input", changed);
+  form.addEventListener("submit", function (e) { e.preventDefault(); });
+  form.addEventListener("reset", function () { setTimeout(changed, 0); });
+  window.addEventListener("hashchange", function () { apply(read()); jump(); });
+  var first = parseView(location.search, KNOWN);
+  fill(first);
+  apply(first);
+  jump();
+})(${parseView.name}, ${writeView.name}, ${visible.name});`;
 }
 
 // src/tree.ts
@@ -9526,13 +9637,13 @@ var plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 var STAGES = ["in_progress", "approved", "proposed"];
 function renderOverview(o, first) {
   if (!o.rows.length) return "";
-  const num = (n) => `<td class="num">${n || ""}</td>`;
+  const num = (n, top, status, horizon) => `<td class="num">${n ? `<a href="?${esc(writeView({ q: "", status, horizon, top }))}#specs">${n}</a>` : ""}</td>`;
   const row = (r) => {
     const pct = r.total ? Math.round(r.counts.done / r.total * 100) : 0;
     const name = r.id ? `<a href="#spec-${esc(r.id)}">${esc(r.title)}</a>` : esc(r.title);
     return `<tr${r.id ? "" : ' class="all"'}><th scope="row">${name}</th><td class="progress"><span class="bar"><span style="width:${pct}%"></span></span> ${r.counts.done} of ${r.total} done</td>${STAGES.map(
-      (s) => num(r.counts[s])
-    ).join("")}${o.horizons.map((h) => num(r.horizons[h] ?? 0)).join("")}</tr>`;
+      (s) => num(r.counts[s], r.id, s, null)
+    ).join("")}${o.horizons.map((h) => num(r.horizons[h] ?? 0, r.id, "", h)).join("")}</tr>`;
   };
   const stages = STAGES.map((s) => `<th class="num stage"${o.horizons.length ? ' rowspan="2"' : ""}>${LABEL[s]}</th>`).join("");
   const span = o.horizons.length ? ' rowspan="2"' : "";
@@ -9554,7 +9665,20 @@ function renderDetail(n) {
   const criteria = n.criteria.length ? `<ol class="criteria">${n.criteria.map((c) => `<li><span>${inline(c.text)}</span> <span class="muted">Tested in ${c.tests.map((t) => `<code>${esc(t)}</code>`).join(", ")}</span></li>`).join("")}</ol>` : "";
   return `<div class="detail">${summary}${criteria}</div>`;
 }
-function renderNode(n, repoUrl, root) {
+function renderFind(data) {
+  if (!data.tree.length) return "";
+  const option = (value, text) => `<option value="${esc(value)}">${esc(text)}</option>`;
+  const o = data.overview;
+  const horizon = o.horizons.length ? `<select name="horizon" aria-label="Horizon">${option("", "Any horizon")}${o.horizons.map((h) => option(`h:${h}`, h || "no horizon")).join("")}</select>` : "";
+  return `<form class="find" id="find" role="search" hidden><input type="search" name="q" placeholder="Search specs\u2026" aria-label="Search specs" autocomplete="off"><select name="status" aria-label="Status">${option(
+    "",
+    "Any status"
+  )}${ORDER.map((s) => option(s, LABEL[s])).join("")}</select>${horizon}<select name="top" aria-label="${esc(data.levels[0] ?? "spec")}">${option(
+    "",
+    `Any ${data.levels[0] ?? "spec"}`
+  )}${o.rows.map((r) => option(r.id, r.title)).join("")}</select><span class="muted" id="find-count" aria-live="polite"></span><button type="reset" id="find-clear" hidden>Clear</button></form>`;
+}
+function renderNode(n, repoUrl, root, closed) {
   const counts = n.kind === "group" ? ORDER.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ") : "";
   const open = n.open.map((o) => `<a class="pr" href="${repoUrl}/pull/${o.pr}">#${o.pr} ${o.change === "added" ? "" : o.change + ", "}${LABEL[o.status].toLowerCase()}</a>`).join(" ");
   const inMain = (n.status === "done" || n.status === "planned") && !n.open.some((o) => o.change === "added");
@@ -9562,9 +9686,11 @@ function renderNode(n, repoUrl, root) {
   const many = n.criteria.length ? `<span class="muted">${plural(n.criteria.length, "criterion", "criteria")}</span>` : "";
   const head = `<span class="level">${esc(n.level)}</span> <a class="title" href="${href}">${esc(n.title)}</a> <code>${esc(n.name)}</code> ${n.kind === "leaf" ? pill(n.status, n.status === "planned" && n.horizon ? `Planned: ${n.horizon}` : LABEL[n.status]) : counts || pill(n.status)} ${inMain || n.kind === "group" ? open : ""} ${many}`;
   const detail = renderDetail(n);
-  const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root)).join("")}</ul>` : "";
-  if (!detail && !kids) return `<li class="node" id="spec-${esc(n.id)}"><div class="row plain">${head}</div></li>`;
-  return `<li class="node" id="spec-${esc(n.id)}"><details${kids ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
+  const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root, closed)).join("")}</ul>` : "";
+  const text = `${n.title} ${n.id} ${n.summary}`.toLowerCase();
+  const li = `<li class="node" id="spec-${esc(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc(n.horizon)}" data-text="${esc(text)}">`;
+  if (!detail && !kids) return `${li}<div class="row plain">${head}</div></li>`;
+  return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
 }
 function renderVotes(p, threshold) {
   const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
@@ -9587,13 +9713,16 @@ function renderHtml(data, cfg, serverUrl = "https://github.com") {
   const repoUrl = `${serverUrl}/${data.repository}`;
   const name = data.repository.split("/").pop();
   const first = data.levels[0] ? data.levels[0][0].toUpperCase() + data.levels[0].slice(1) : "Spec";
+  const over = cfg.dashboard.collapse_over;
+  const closed = over > 0 && data.overview.all.total > over;
+  const known = { statuses: ORDER, horizons: data.overview.horizons, tops: data.overview.rows.map((r) => r.id) };
   const proposals = data.proposals.length ? `<table><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead><tbody>${data.proposals.map(
     (p) => `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}</div><div>${p.nodes.map((n) => `<code>${esc(n)}</code>`).join(" ")}</div></td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
       p,
       data.threshold
     )}</td><td>${renderNext(p)}</td></tr>`
   ).join("")}</tbody></table>` : `<p class="muted">No open spec pull requests.</p>`;
-  const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root)).join("")}</ul>` : `<p class="muted">No specs yet. Add the first one under <code>${esc(cfg.root)}/</code>.</p>`;
+  const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root, closed)).join("")}</ul>` : `<p class="muted">No specs yet. Add the first one under <code>${esc(cfg.root)}/</code>.</p>`;
   const against = data.max_against === 0 ? "none against" : `at most ${data.max_against} against`;
   const intro = `Every change to ${esc(name)} starts as a spec under <code>${esc(cfg.root)}/</code>, proposed in a pull request. People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
     data.threshold,
@@ -9638,6 +9767,10 @@ td:first-child{width:38%}td:last-child{width:32%}
 .bar{display:inline-block;width:96px;height:8px;margin-right:8px;border-radius:4px;background:var(--line);overflow:hidden;vertical-align:middle}
 .bar span{display:block;height:100%;background:var(--done)}
 .node{scroll-margin-top:12px}
+.overview td a{display:block;color:inherit}
+.find{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}.find[hidden],.find [hidden]{display:none}
+.find input,.find select,.find button{font:inherit;font-size:15px;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;max-width:100%}
+.find input{flex:1 1 220px;min-width:0}.find select{max-width:240px}.find button{cursor:pointer;color:var(--link)}
 .next{font-weight:600}
 ul{list-style:none;margin:0;padding:0}
 .tree ul{margin-left:4px;padding-left:16px;border-left:1px solid var(--line)}
@@ -9665,10 +9798,14 @@ table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) t
 ${renderOverview(data.overview, first)}
 <h2>Open proposals</h2>
 <div class="box">${proposals}</div>
-<h2>Specs</h2>
+<h2 id="specs">Specs</h2>
+${renderFind(data)}
 <div class="box">${tree}</div>
 <footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
+${data.tree.length ? `<script>
+${findScript(known)}
+</script>` : ""}
 </body>
 </html>
 `;

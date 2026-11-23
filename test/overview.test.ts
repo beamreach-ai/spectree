@@ -107,7 +107,7 @@ test("horizon-columns: now, next, later, the others alphabetically, no horizon l
   const rows = table(page(none));
   assert.deepEqual(rows[0].slice(1), ["Progress", "In progress", "Approved", "Proposed"]);
   assert.equal(rows.length, 3, "one heading row, the node, and All");
-  assert.doesNotMatch(page(none), />Planned</);
+  assert.doesNotMatch(/<table class="overview">.*?<\/table>/s.exec(page(none))![0], />Planned</);
 });
 
 test("horizon-counts: planned leaves per horizon, adding up to the tree's planned count", () => {
@@ -147,7 +147,7 @@ test("jump: a row's title links to the node's row in the tree, and every node ha
   const walk = (n: DashNode) => (ids.push(n.id), n.children.forEach(walk));
   d.tree.forEach(walk);
   assert.equal(ids.length, 17);
-  for (const id of ids) assert.equal(html.split(`<li class="node" id="spec-${id}">`).length, 2, id);
+  for (const id of ids) assert.equal(html.split(`<li class="node" id="spec-${id}"`).length, 2, id);
   assert.doesNotMatch(html, /<tr class="all"><th scope="row"><a/, "All links nowhere");
 });
 

@@ -1,5 +1,6 @@
 import type { Config } from "./config.ts";
 import type { NodeChange, Phase, PrResult } from "./evaluate.ts";
+import { findScript, writeView } from "./find.ts";
 import { type Criterion, type Spec, levelName } from "./tree.ts";
 
 export type NodeStatus = "done" | "planned" | "proposed" | "approved" | "in_progress";
@@ -206,13 +207,15 @@ const STAGES: NodeStatus[] = ["in_progress", "approved", "proposed"];
 
 function renderOverview(o: Overview, first: string): string {
   if (!o.rows.length) return "";
-  const num = (n: number) => `<td class="num">${n || ""}</td>`;
+  // A number links to the tree narrowed to what it counts.
+  const num = (n: number, top: string, status: string, horizon: string | null) =>
+    `<td class="num">${n ? `<a href="?${esc(writeView({ q: "", status, horizon, top }))}#specs">${n}</a>` : ""}</td>`;
   const row = (r: OverviewRow) => {
     const pct = r.total ? Math.round((r.counts.done / r.total) * 100) : 0;
     const name = r.id ? `<a href="#spec-${esc(r.id)}">${esc(r.title)}</a>` : esc(r.title);
     return `<tr${r.id ? "" : ' class="all"'}><th scope="row">${name}</th><td class="progress"><span class="bar"><span style="width:${pct}%"></span></span> ${r.counts.done} of ${r.total} done</td>${STAGES.map(
-      (s) => num(r.counts[s]),
-    ).join("")}${o.horizons.map((h) => num(r.horizons[h] ?? 0)).join("")}</tr>`;
+      (s) => num(r.counts[s], r.id, s, null),
+    ).join("")}${o.horizons.map((h) => num(r.horizons[h] ?? 0, r.id, "", h)).join("")}</tr>`;
   };
   const stages = STAGES.map((s) => `<th class="num stage"${o.horizons.length ? ' rowspan="2"' : ""}>${LABEL[s]}</th>`).join("");
   const span = o.horizons.length ? ' rowspan="2"' : "";
@@ -245,7 +248,23 @@ function renderDetail(n: DashNode): string {
   return `<div class="detail">${summary}${criteria}</div>`;
 }
 
-function renderNode(n: DashNode, repoUrl: string, root: string): string {
+function renderFind(data: DashData): string {
+  if (!data.tree.length) return "";
+  const option = (value: string, text: string) => `<option value="${esc(value)}">${esc(text)}</option>`;
+  const o = data.overview;
+  const horizon = o.horizons.length
+    ? `<select name="horizon" aria-label="Horizon">${option("", "Any horizon")}${o.horizons.map((h) => option(`h:${h}`, h || "no horizon")).join("")}</select>`
+    : "";
+  return `<form class="find" id="find" role="search" hidden><input type="search" name="q" placeholder="Search specs…" aria-label="Search specs" autocomplete="off"><select name="status" aria-label="Status">${option(
+    "",
+    "Any status",
+  )}${ORDER.map((s) => option(s, LABEL[s])).join("")}</select>${horizon}<select name="top" aria-label="${esc(data.levels[0] ?? "spec")}">${option(
+    "",
+    `Any ${data.levels[0] ?? "spec"}`,
+  )}${o.rows.map((r) => option(r.id, r.title)).join("")}</select><span class="muted" id="find-count" aria-live="polite"></span><button type="reset" id="find-clear" hidden>Clear</button></form>`;
+}
+
+function renderNode(n: DashNode, repoUrl: string, root: string, closed: boolean): string {
   const counts = n.kind === "group" ? ORDER.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ") : "";
   const open = n.open
     .map((o) => `<a class="pr" href="${repoUrl}/pull/${o.pr}">#${o.pr} ${o.change === "added" ? "" : o.change + ", "}${LABEL[o.status].toLowerCase()}</a>`)
@@ -258,9 +277,11 @@ function renderNode(n: DashNode, repoUrl: string, root: string): string {
     n.kind === "leaf" ? pill(n.status, n.status === "planned" && n.horizon ? `Planned: ${n.horizon}` : LABEL[n.status]) : counts || pill(n.status)
   } ${inMain || n.kind === "group" ? open : ""} ${many}`;
   const detail = renderDetail(n);
-  const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root)).join("")}</ul>` : "";
-  if (!detail && !kids) return `<li class="node" id="spec-${esc(n.id)}"><div class="row plain">${head}</div></li>`;
-  return `<li class="node" id="spec-${esc(n.id)}"><details${kids ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
+  const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root, closed)).join("")}</ul>` : "";
+  const text = `${n.title} ${n.id} ${n.summary}`.toLowerCase();
+  const li = `<li class="node" id="spec-${esc(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc(n.horizon)}" data-text="${esc(text)}">`;
+  if (!detail && !kids) return `${li}<div class="row plain">${head}</div></li>`;
+  return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
 }
 
 function renderVotes(p: DashPr, threshold: number): string {
@@ -290,6 +311,10 @@ export function renderHtml(data: DashData, cfg: Config, serverUrl = "https://git
   const repoUrl = `${serverUrl}/${data.repository}`;
   const name = data.repository.split("/").pop()!;
   const first = data.levels[0] ? data.levels[0][0].toUpperCase() + data.levels[0].slice(1) : "Spec";
+  // A large roadmap opens with its groups closed.
+  const over = cfg.dashboard.collapse_over;
+  const closed = over > 0 && data.overview.all.total > over;
+  const known = { statuses: ORDER as string[], horizons: data.overview.horizons, tops: data.overview.rows.map((r) => r.id) };
   const proposals = data.proposals.length
     ? `<table><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead><tbody>${data.proposals
         .map(
@@ -304,7 +329,7 @@ export function renderHtml(data: DashData, cfg: Config, serverUrl = "https://git
         .join("")}</tbody></table>`
     : `<p class="muted">No open spec pull requests.</p>`;
   const tree = data.tree.length
-    ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root)).join("")}</ul>`
+    ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root, closed)).join("")}</ul>`
     : `<p class="muted">No specs yet. Add the first one under <code>${esc(cfg.root)}/</code>.</p>`;
   const against = data.max_against === 0 ? "none against" : `at most ${data.max_against} against`;
   const intro = `Every change to ${esc(name)} starts as a spec under <code>${esc(cfg.root)}/</code>, proposed in a pull request. People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
@@ -350,6 +375,10 @@ td:first-child{width:38%}td:last-child{width:32%}
 .bar{display:inline-block;width:96px;height:8px;margin-right:8px;border-radius:4px;background:var(--line);overflow:hidden;vertical-align:middle}
 .bar span{display:block;height:100%;background:var(--done)}
 .node{scroll-margin-top:12px}
+.overview td a{display:block;color:inherit}
+.find{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}.find[hidden],.find [hidden]{display:none}
+.find input,.find select,.find button{font:inherit;font-size:15px;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;max-width:100%}
+.find input{flex:1 1 220px;min-width:0}.find select{max-width:240px}.find button{cursor:pointer;color:var(--link)}
 .next{font-weight:600}
 ul{list-style:none;margin:0;padding:0}
 .tree ul{margin-left:4px;padding-left:16px;border-left:1px solid var(--line)}
@@ -377,10 +406,12 @@ table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) t
 ${renderOverview(data.overview, first)}
 <h2>Open proposals</h2>
 <div class="box">${proposals}</div>
-<h2>Specs</h2>
+<h2 id="specs">Specs</h2>
+${renderFind(data)}
 <div class="box">${tree}</div>
 <footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
+${data.tree.length ? `<script>\n${findScript(known)}\n</script>` : ""}
 </body>
 </html>
 `;
