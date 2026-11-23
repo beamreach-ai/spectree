@@ -29,9 +29,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/yaml/dist/nodes/identity.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
-  "node_modules/yaml/dist/nodes/identity.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/identity.js"(exports2) {
     "use strict";
     var ALIAS = /* @__PURE__ */ Symbol.for("yaml.alias");
     var DOC = /* @__PURE__ */ Symbol.for("yaml.document");
@@ -86,9 +86,9 @@ var require_identity = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/visit.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/visit.js
 var require_visit = __commonJS({
-  "node_modules/yaml/dist/visit.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/visit.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var BREAK = /* @__PURE__ */ Symbol("break visit");
@@ -244,9 +244,9 @@ var require_visit = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/doc/directives.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/directives.js
 var require_directives = __commonJS({
-  "node_modules/yaml/dist/doc/directives.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/directives.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var visit = require_visit();
@@ -415,9 +415,9 @@ var require_directives = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/doc/anchors.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/anchors.js
 var require_anchors = __commonJS({
-  "node_modules/yaml/dist/doc/anchors.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/anchors.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var visit = require_visit();
@@ -485,9 +485,9 @@ var require_anchors = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/doc/applyReviver.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/applyReviver.js
 var require_applyReviver = __commonJS({
-  "node_modules/yaml/dist/doc/applyReviver.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/applyReviver.js"(exports2) {
     "use strict";
     function applyReviver(reviver, obj, key, val) {
       if (val && typeof val === "object") {
@@ -535,9 +535,9 @@ var require_applyReviver = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/nodes/toJS.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/toJS.js
 var require_toJS = __commonJS({
-  "node_modules/yaml/dist/nodes/toJS.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/toJS.js"(exports2) {
     "use strict";
     var identity = require_identity();
     function toJS(value, arg, ctx) {
@@ -565,9 +565,9 @@ var require_toJS = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/nodes/Node.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Node.js
 var require_Node = __commonJS({
-  "node_modules/yaml/dist/nodes/Node.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Node.js"(exports2) {
     "use strict";
     var applyReviver = require_applyReviver();
     var identity = require_identity();
@@ -606,9 +606,9 @@ var require_Node = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/nodes/Alias.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Alias.js
 var require_Alias = __commonJS({
-  "node_modules/yaml/dist/nodes/Alias.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Alias.js"(exports2) {
     "use strict";
     var anchors = require_anchors();
     var visit = require_visit();
@@ -724,9 +724,9 @@ var require_Alias = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/nodes/Scalar.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Scalar.js
 var require_Scalar = __commonJS({
-  "node_modules/yaml/dist/nodes/Scalar.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Scalar.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var Node = require_Node();
@@ -754,9 +754,9 @@ var require_Scalar = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/doc/createNode.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/createNode.js
 var require_createNode = __commonJS({
-  "node_modules/yaml/dist/doc/createNode.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/createNode.js"(exports2) {
     "use strict";
     var Alias = require_Alias();
     var identity = require_identity();
@@ -829,9 +829,9 @@ var require_createNode = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/nodes/Collection.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Collection.js
 var require_Collection = __commonJS({
-  "node_modules/yaml/dist/nodes/Collection.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Collection.js"(exports2) {
     "use strict";
     var createNode = require_createNode();
     var identity = require_identity();
@@ -972,9 +972,9 @@ var require_Collection = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/stringify/stringifyComment.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyComment.js
 var require_stringifyComment = __commonJS({
-  "node_modules/yaml/dist/stringify/stringifyComment.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyComment.js"(exports2) {
     "use strict";
     var stringifyComment = (str) => str.replace(/^(?!$)(?: $)?/gm, "#");
     function indentComment(comment, indent) {
@@ -989,9 +989,9 @@ var require_stringifyComment = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/stringify/foldFlowLines.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/foldFlowLines.js
 var require_foldFlowLines = __commonJS({
-  "node_modules/yaml/dist/stringify/foldFlowLines.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/foldFlowLines.js"(exports2) {
     "use strict";
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
@@ -1125,9 +1125,9 @@ ${indent}${text.slice(fold + 1, end2)}`;
   }
 });
 
-// node_modules/yaml/dist/stringify/stringifyString.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyString.js
 var require_stringifyString = __commonJS({
-  "node_modules/yaml/dist/stringify/stringifyString.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyString.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     var foldFlowLines = require_foldFlowLines();
@@ -1408,9 +1408,9 @@ ${indent}`);
   }
 });
 
-// node_modules/yaml/dist/stringify/stringify.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringify.js
 var require_stringify = __commonJS({
-  "node_modules/yaml/dist/stringify/stringify.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringify.js"(exports2) {
     "use strict";
     var anchors = require_anchors();
     var identity = require_identity();
@@ -1532,9 +1532,9 @@ ${ctx.indent}${str}`;
   }
 });
 
-// node_modules/yaml/dist/stringify/stringifyPair.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyPair.js
 var require_stringifyPair = __commonJS({
-  "node_modules/yaml/dist/stringify/stringifyPair.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyPair.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var Scalar = require_Scalar();
@@ -1665,9 +1665,9 @@ ${ctx.indent}`;
   }
 });
 
-// node_modules/yaml/dist/log.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/log.js
 var require_log = __commonJS({
-  "node_modules/yaml/dist/log.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/log.js"(exports2) {
     "use strict";
     var node_process = require("process");
     function debug(logLevel, ...messages) {
@@ -1687,9 +1687,9 @@ var require_log = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/merge.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/merge.js
 var require_merge = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/merge.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/merge.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var Scalar = require_Scalar();
@@ -1747,9 +1747,9 @@ var require_merge = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/nodes/addPairToJSMap.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/addPairToJSMap.js
 var require_addPairToJSMap = __commonJS({
-  "node_modules/yaml/dist/nodes/addPairToJSMap.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/addPairToJSMap.js"(exports2) {
     "use strict";
     var log = require_log();
     var merge = require_merge();
@@ -1811,9 +1811,9 @@ var require_addPairToJSMap = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/nodes/Pair.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Pair.js
 var require_Pair = __commonJS({
-  "node_modules/yaml/dist/nodes/Pair.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/Pair.js"(exports2) {
     "use strict";
     var createNode = require_createNode();
     var stringifyPair = require_stringifyPair();
@@ -1851,9 +1851,9 @@ var require_Pair = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/stringify/stringifyCollection.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyCollection.js
 var require_stringifyCollection = __commonJS({
-  "node_modules/yaml/dist/stringify/stringifyCollection.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyCollection.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var stringify = require_stringify();
@@ -2002,9 +2002,9 @@ ${indent}${end}`;
   }
 });
 
-// node_modules/yaml/dist/nodes/YAMLMap.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/YAMLMap.js
 var require_YAMLMap = __commonJS({
-  "node_modules/yaml/dist/nodes/YAMLMap.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/YAMLMap.js"(exports2) {
     "use strict";
     var stringifyCollection = require_stringifyCollection();
     var addPairToJSMap = require_addPairToJSMap();
@@ -2146,9 +2146,9 @@ var require_YAMLMap = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/common/map.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/common/map.js
 var require_map = __commonJS({
-  "node_modules/yaml/dist/schema/common/map.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/common/map.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var YAMLMap = require_YAMLMap();
@@ -2168,9 +2168,9 @@ var require_map = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/nodes/YAMLSeq.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/YAMLSeq.js
 var require_YAMLSeq = __commonJS({
-  "node_modules/yaml/dist/nodes/YAMLSeq.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/nodes/YAMLSeq.js"(exports2) {
     "use strict";
     var createNode = require_createNode();
     var stringifyCollection = require_stringifyCollection();
@@ -2284,9 +2284,9 @@ var require_YAMLSeq = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/common/seq.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/common/seq.js
 var require_seq = __commonJS({
-  "node_modules/yaml/dist/schema/common/seq.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/common/seq.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var YAMLSeq = require_YAMLSeq();
@@ -2306,9 +2306,9 @@ var require_seq = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/common/string.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/common/string.js
 var require_string = __commonJS({
-  "node_modules/yaml/dist/schema/common/string.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/common/string.js"(exports2) {
     "use strict";
     var stringifyString = require_stringifyString();
     var string = {
@@ -2325,9 +2325,9 @@ var require_string = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/common/null.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/common/null.js
 var require_null = __commonJS({
-  "node_modules/yaml/dist/schema/common/null.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/common/null.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     var nullTag = {
@@ -2343,9 +2343,9 @@ var require_null = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/core/bool.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/core/bool.js
 var require_bool = __commonJS({
-  "node_modules/yaml/dist/schema/core/bool.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/core/bool.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     var boolTag = {
@@ -2367,9 +2367,9 @@ var require_bool = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/stringify/stringifyNumber.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyNumber.js
 var require_stringifyNumber = __commonJS({
-  "node_modules/yaml/dist/stringify/stringifyNumber.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyNumber.js"(exports2) {
     "use strict";
     function stringifyNumber({ format, minFractionDigits, tag, value }) {
       if (typeof value === "bigint")
@@ -2394,9 +2394,9 @@ var require_stringifyNumber = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/core/float.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/core/float.js
 var require_float = __commonJS({
-  "node_modules/yaml/dist/schema/core/float.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/core/float.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     var stringifyNumber = require_stringifyNumber();
@@ -2440,9 +2440,9 @@ var require_float = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/core/int.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/core/int.js
 var require_int = __commonJS({
-  "node_modules/yaml/dist/schema/core/int.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/core/int.js"(exports2) {
     "use strict";
     var stringifyNumber = require_stringifyNumber();
     var intIdentify = (value) => typeof value === "bigint" || Number.isInteger(value);
@@ -2485,9 +2485,9 @@ var require_int = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/core/schema.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/core/schema.js
 var require_schema = __commonJS({
-  "node_modules/yaml/dist/schema/core/schema.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/core/schema.js"(exports2) {
     "use strict";
     var map = require_map();
     var _null = require_null();
@@ -2513,9 +2513,9 @@ var require_schema = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/json/schema.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/json/schema.js
 var require_schema2 = __commonJS({
-  "node_modules/yaml/dist/schema/json/schema.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/json/schema.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     var map = require_map();
@@ -2580,9 +2580,9 @@ var require_schema2 = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/binary.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/binary.js
 var require_binary = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/binary.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/binary.js"(exports2) {
     "use strict";
     var node_buffer = require("buffer");
     var Scalar = require_Scalar();
@@ -2646,9 +2646,9 @@ var require_binary = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/pairs.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/pairs.js
 var require_pairs = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/pairs.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/pairs.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
@@ -2724,9 +2724,9 @@ ${cn.comment}` : item.comment;
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/omap.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/omap.js
 var require_omap = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/omap.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/omap.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var toJS = require_toJS();
@@ -2802,9 +2802,9 @@ var require_omap = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/bool.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/bool.js
 var require_bool2 = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/bool.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/bool.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     function boolStringify({ value, source }, ctx) {
@@ -2834,9 +2834,9 @@ var require_bool2 = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/float.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/float.js
 var require_float2 = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/float.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/float.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     var stringifyNumber = require_stringifyNumber();
@@ -2883,9 +2883,9 @@ var require_float2 = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/int.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/int.js
 var require_int2 = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/int.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/int.js"(exports2) {
     "use strict";
     var stringifyNumber = require_stringifyNumber();
     var intIdentify = (value) => typeof value === "bigint" || Number.isInteger(value);
@@ -2962,9 +2962,9 @@ var require_int2 = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/set.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/set.js
 var require_set = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/set.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/set.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
@@ -3051,9 +3051,9 @@ var require_set = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/timestamp.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/timestamp.js
 var require_timestamp = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/timestamp.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/timestamp.js"(exports2) {
     "use strict";
     var stringifyNumber = require_stringifyNumber();
     function parseSexagesimal(str, asBigInt) {
@@ -3139,9 +3139,9 @@ var require_timestamp = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/yaml-1.1/schema.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/schema.js
 var require_schema3 = __commonJS({
-  "node_modules/yaml/dist/schema/yaml-1.1/schema.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/yaml-1.1/schema.js"(exports2) {
     "use strict";
     var map = require_map();
     var _null = require_null();
@@ -3183,9 +3183,9 @@ var require_schema3 = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/tags.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/tags.js
 var require_tags = __commonJS({
-  "node_modules/yaml/dist/schema/tags.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/tags.js"(exports2) {
     "use strict";
     var map = require_map();
     var _null = require_null();
@@ -3277,9 +3277,9 @@ var require_tags = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/schema/Schema.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/Schema.js
 var require_Schema = __commonJS({
-  "node_modules/yaml/dist/schema/Schema.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/schema/Schema.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var map = require_map();
@@ -3309,9 +3309,9 @@ var require_Schema = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/stringify/stringifyDocument.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyDocument.js
 var require_stringifyDocument = __commonJS({
-  "node_modules/yaml/dist/stringify/stringifyDocument.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/stringify/stringifyDocument.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var stringify = require_stringify();
@@ -3389,9 +3389,9 @@ var require_stringifyDocument = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/doc/Document.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/Document.js
 var require_Document = __commonJS({
-  "node_modules/yaml/dist/doc/Document.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/doc/Document.js"(exports2) {
     "use strict";
     var Alias = require_Alias();
     var Collection = require_Collection();
@@ -3698,9 +3698,9 @@ var require_Document = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/errors.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/errors.js
 var require_errors = __commonJS({
-  "node_modules/yaml/dist/errors.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/errors.js"(exports2) {
     "use strict";
     var YAMLError = class extends Error {
       constructor(name, pos, code, message) {
@@ -3763,9 +3763,9 @@ ${pointer}
   }
 });
 
-// node_modules/yaml/dist/compose/resolve-props.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-props.js
 var require_resolve_props = __commonJS({
-  "node_modules/yaml/dist/compose/resolve-props.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-props.js"(exports2) {
     "use strict";
     function resolveProps(tokens, { flow, indicator, next, offset, onError, parentIndent, startOnNewline }) {
       let spaceBefore = false;
@@ -3897,9 +3897,9 @@ var require_resolve_props = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/util-contains-newline.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/util-contains-newline.js
 var require_util_contains_newline = __commonJS({
-  "node_modules/yaml/dist/compose/util-contains-newline.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/util-contains-newline.js"(exports2) {
     "use strict";
     function containsNewline(key) {
       if (!key)
@@ -3939,9 +3939,9 @@ var require_util_contains_newline = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/util-flow-indent-check.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/util-flow-indent-check.js
 var require_util_flow_indent_check = __commonJS({
-  "node_modules/yaml/dist/compose/util-flow-indent-check.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/util-flow-indent-check.js"(exports2) {
     "use strict";
     var utilContainsNewline = require_util_contains_newline();
     function flowIndentCheck(indent, fc, onError) {
@@ -3957,9 +3957,9 @@ var require_util_flow_indent_check = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/util-map-includes.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/util-map-includes.js
 var require_util_map_includes = __commonJS({
-  "node_modules/yaml/dist/compose/util-map-includes.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/util-map-includes.js"(exports2) {
     "use strict";
     var identity = require_identity();
     function mapIncludes(ctx, items, search) {
@@ -3973,9 +3973,9 @@ var require_util_map_includes = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/resolve-block-map.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-block-map.js
 var require_resolve_block_map = __commonJS({
-  "node_modules/yaml/dist/compose/resolve-block-map.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-block-map.js"(exports2) {
     "use strict";
     var Pair = require_Pair();
     var YAMLMap = require_YAMLMap();
@@ -4081,9 +4081,9 @@ var require_resolve_block_map = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/resolve-block-seq.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-block-seq.js
 var require_resolve_block_seq = __commonJS({
-  "node_modules/yaml/dist/compose/resolve-block-seq.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-block-seq.js"(exports2) {
     "use strict";
     var YAMLSeq = require_YAMLSeq();
     var resolveProps = require_resolve_props();
@@ -4132,9 +4132,9 @@ var require_resolve_block_seq = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/resolve-end.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-end.js
 var require_resolve_end = __commonJS({
-  "node_modules/yaml/dist/compose/resolve-end.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-end.js"(exports2) {
     "use strict";
     function resolveEnd(end, offset, reqSpace, onError) {
       let comment = "";
@@ -4175,9 +4175,9 @@ var require_resolve_end = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/resolve-flow-collection.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-flow-collection.js
 var require_resolve_flow_collection = __commonJS({
-  "node_modules/yaml/dist/compose/resolve-flow-collection.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-flow-collection.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
@@ -4369,9 +4369,9 @@ var require_resolve_flow_collection = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/compose-collection.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/compose-collection.js
 var require_compose_collection = __commonJS({
-  "node_modules/yaml/dist/compose/compose-collection.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/compose-collection.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var Scalar = require_Scalar();
@@ -4434,9 +4434,9 @@ var require_compose_collection = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/resolve-block-scalar.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-block-scalar.js
 var require_resolve_block_scalar = __commonJS({
-  "node_modules/yaml/dist/compose/resolve-block-scalar.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-block-scalar.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     function resolveBlockScalar(ctx, scalar, onError) {
@@ -4617,9 +4617,9 @@ var require_resolve_block_scalar = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/resolve-flow-scalar.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-flow-scalar.js
 var require_resolve_flow_scalar = __commonJS({
-  "node_modules/yaml/dist/compose/resolve-flow-scalar.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/resolve-flow-scalar.js"(exports2) {
     "use strict";
     var Scalar = require_Scalar();
     var resolveEnd = require_resolve_end();
@@ -4838,9 +4838,9 @@ var require_resolve_flow_scalar = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/compose-scalar.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/compose-scalar.js
 var require_compose_scalar = __commonJS({
-  "node_modules/yaml/dist/compose/compose-scalar.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/compose-scalar.js"(exports2) {
     "use strict";
     var identity = require_identity();
     var Scalar = require_Scalar();
@@ -4919,9 +4919,9 @@ var require_compose_scalar = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/util-empty-scalar-position.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/util-empty-scalar-position.js
 var require_util_empty_scalar_position = __commonJS({
-  "node_modules/yaml/dist/compose/util-empty-scalar-position.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/util-empty-scalar-position.js"(exports2) {
     "use strict";
     function emptyScalarPosition(offset, before, pos) {
       if (before) {
@@ -4949,9 +4949,9 @@ var require_util_empty_scalar_position = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/compose-node.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/compose-node.js
 var require_compose_node = __commonJS({
-  "node_modules/yaml/dist/compose/compose-node.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/compose-node.js"(exports2) {
     "use strict";
     var Alias = require_Alias();
     var identity = require_identity();
@@ -5055,9 +5055,9 @@ var require_compose_node = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/compose-doc.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/compose-doc.js
 var require_compose_doc = __commonJS({
-  "node_modules/yaml/dist/compose/compose-doc.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/compose-doc.js"(exports2) {
     "use strict";
     var Document = require_Document();
     var composeNode = require_compose_node();
@@ -5098,9 +5098,9 @@ var require_compose_doc = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/compose/composer.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/composer.js
 var require_composer = __commonJS({
-  "node_modules/yaml/dist/compose/composer.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/compose/composer.js"(exports2) {
     "use strict";
     var node_process = require("process");
     var directives = require_directives();
@@ -5306,9 +5306,9 @@ ${end.comment}` : end.comment;
   }
 });
 
-// node_modules/yaml/dist/parse/cst-scalar.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/cst-scalar.js
 var require_cst_scalar = __commonJS({
-  "node_modules/yaml/dist/parse/cst-scalar.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/cst-scalar.js"(exports2) {
     "use strict";
     var resolveBlockScalar = require_resolve_block_scalar();
     var resolveFlowScalar = require_resolve_flow_scalar();
@@ -5491,9 +5491,9 @@ var require_cst_scalar = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/parse/cst-stringify.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/cst-stringify.js
 var require_cst_stringify = __commonJS({
-  "node_modules/yaml/dist/parse/cst-stringify.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/cst-stringify.js"(exports2) {
     "use strict";
     var stringify = (cst) => "type" in cst ? stringifyToken(cst) : stringifyItem(cst);
     function stringifyToken(token) {
@@ -5552,9 +5552,9 @@ var require_cst_stringify = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/parse/cst-visit.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/cst-visit.js
 var require_cst_visit = __commonJS({
-  "node_modules/yaml/dist/parse/cst-visit.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/cst-visit.js"(exports2) {
     "use strict";
     var BREAK = /* @__PURE__ */ Symbol("break visit");
     var SKIP2 = /* @__PURE__ */ Symbol("skip children");
@@ -5614,9 +5614,9 @@ var require_cst_visit = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/parse/cst.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/cst.js
 var require_cst = __commonJS({
-  "node_modules/yaml/dist/parse/cst.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/cst.js"(exports2) {
     "use strict";
     var cstScalar = require_cst_scalar();
     var cstStringify = require_cst_stringify();
@@ -5716,9 +5716,9 @@ var require_cst = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/parse/lexer.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/lexer.js
 var require_lexer = __commonJS({
-  "node_modules/yaml/dist/parse/lexer.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/lexer.js"(exports2) {
     "use strict";
     var cst = require_cst();
     function isEmpty(ch) {
@@ -6305,9 +6305,9 @@ var require_lexer = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/parse/line-counter.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/line-counter.js
 var require_line_counter = __commonJS({
-  "node_modules/yaml/dist/parse/line-counter.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/line-counter.js"(exports2) {
     "use strict";
     var LineCounter = class {
       constructor() {
@@ -6336,22 +6336,22 @@ var require_line_counter = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/parse/parser.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/parser.js
 var require_parser = __commonJS({
-  "node_modules/yaml/dist/parse/parser.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/parse/parser.js"(exports2) {
     "use strict";
     var node_process = require("process");
     var cst = require_cst();
     var lexer = require_lexer();
-    function includesToken(list2, type) {
-      for (let i = 0; i < list2.length; ++i)
-        if (list2[i].type === type)
+    function includesToken(list3, type) {
+      for (let i = 0; i < list3.length; ++i)
+        if (list3[i].type === type)
           return true;
       return false;
     }
-    function findNonEmptyIndex(list2) {
-      for (let i = 0; i < list2.length; ++i) {
-        switch (list2[i].type) {
+    function findNonEmptyIndex(list3) {
+      for (let i = 0; i < list3.length; ++i) {
+        switch (list3[i].type) {
           case "space":
           case "comment":
           case "newline":
@@ -7210,9 +7210,9 @@ var require_parser = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/public-api.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/public-api.js
 var require_public_api = __commonJS({
-  "node_modules/yaml/dist/public-api.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/public-api.js"(exports2) {
     "use strict";
     var composer = require_composer();
     var Document = require_Document();
@@ -7307,9 +7307,9 @@ var require_public_api = __commonJS({
   }
 });
 
-// node_modules/yaml/dist/index.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/index.js
 var require_dist = __commonJS({
-  "node_modules/yaml/dist/index.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/yaml/dist/index.js"(exports2) {
     "use strict";
     var composer = require_composer();
     var Document = require_Document();
@@ -7359,9 +7359,9 @@ var require_dist = __commonJS({
   }
 });
 
-// node_modules/picomatch/lib/constants.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/constants.js
 var require_constants = __commonJS({
-  "node_modules/picomatch/lib/constants.js"(exports2, module2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/constants.js"(exports2, module2) {
     "use strict";
     var WIN_SLASH = "\\\\/";
     var WIN_NO_SLASH = `[^${WIN_SLASH}]`;
@@ -7561,9 +7561,9 @@ var require_constants = __commonJS({
   }
 });
 
-// node_modules/picomatch/lib/utils.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/utils.js
 var require_utils = __commonJS({
-  "node_modules/picomatch/lib/utils.js"(exports2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/utils.js"(exports2) {
     "use strict";
     var {
       REGEX_BACKSLASH,
@@ -7625,9 +7625,9 @@ var require_utils = __commonJS({
   }
 });
 
-// node_modules/picomatch/lib/scan.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/scan.js
 var require_scan = __commonJS({
-  "node_modules/picomatch/lib/scan.js"(exports2, module2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/scan.js"(exports2, module2) {
     "use strict";
     var utils = require_utils();
     var {
@@ -7963,9 +7963,9 @@ var require_scan = __commonJS({
   }
 });
 
-// node_modules/picomatch/lib/parse.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/parse.js
 var require_parse = __commonJS({
-  "node_modules/picomatch/lib/parse.js"(exports2, module2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/parse.js"(exports2, module2) {
     "use strict";
     var constants = require_constants();
     var utils = require_utils();
@@ -8398,14 +8398,14 @@ var require_parse = __commonJS({
       };
       if (opts.fastpaths !== false && !/(^[*!]|[/()[\]{}"])/.test(input)) {
         let backslashes = false;
-        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc2, chars, first, rest, index) => {
+        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc3, chars, first, rest, index) => {
           if (first === "\\") {
             backslashes = true;
             return m;
           }
           if (first === "?") {
-            if (esc2) {
-              return esc2 + first + (rest ? QMARK.repeat(rest.length) : "");
+            if (esc3) {
+              return esc3 + first + (rest ? QMARK.repeat(rest.length) : "");
             }
             if (index === 0) {
               return qmarkNoDot + (rest ? QMARK.repeat(rest.length) : "");
@@ -8416,12 +8416,12 @@ var require_parse = __commonJS({
             return DOT_LITERAL.repeat(chars.length);
           }
           if (first === "*") {
-            if (esc2) {
-              return esc2 + first + (rest ? star : "");
+            if (esc3) {
+              return esc3 + first + (rest ? star : "");
             }
             return star;
           }
-          return esc2 ? m : `\\${m}`;
+          return esc3 ? m : `\\${m}`;
         });
         if (backslashes === true) {
           if (opts.unescape === true) {
@@ -8978,9 +8978,9 @@ var require_parse = __commonJS({
   }
 });
 
-// node_modules/picomatch/lib/picomatch.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/picomatch.js
 var require_picomatch = __commonJS({
-  "node_modules/picomatch/lib/picomatch.js"(exports2, module2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/lib/picomatch.js"(exports2, module2) {
     "use strict";
     var scan = require_scan();
     var parse3 = require_parse();
@@ -9118,9 +9118,9 @@ var require_picomatch = __commonJS({
   }
 });
 
-// node_modules/picomatch/index.js
+// ../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/index.js
 var require_picomatch2 = __commonJS({
-  "node_modules/picomatch/index.js"(exports2, module2) {
+  "../../../../../../../Users/slowloris/github/spectree/node_modules/picomatch/index.js"(exports2, module2) {
     "use strict";
     var pico = require_picomatch();
     var utils = require_utils();
@@ -9198,6 +9198,14 @@ var GitHub = class {
   pullFiles = (n) => this.all(`/pulls/${n}/files`);
   reviews = (n) => this.all(`/pulls/${n}/reviews`);
   comments = (n) => this.all(`/issues/${n}/comments`);
+  /** Issues, open and closed, that carry a label. Pull requests are left out. */
+  issuesLabeled = async (label) => (await this.all(`/issues?state=all&labels=${encodeURIComponent(label)}`)).filter((i) => !i.pull_request);
+  issue = (n) => this.get(`/issues/${n}`);
+  /** Creates the label when the repository does not have it. */
+  async ensureLabel(name, color, description) {
+    const r = await this.call("GET", `/labels/${encodeURIComponent(name)}`);
+    if (r.status === 404) await this.write("POST", "/labels", { name, color, description });
+  }
   statuses = (sha) => this.all(`/commits/${sha}/statuses`);
   /** True when the user may push to the repository. */
   async canWrite(user) {
@@ -9254,6 +9262,7 @@ var DEFAULTS = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
+  demand: { enabled: true, top: 3 },
   dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30 }
 };
 function loadConfig(text) {
@@ -9307,6 +9316,21 @@ function loadConfig(text) {
         if (value === "fail" || value === "close" || value === "allow") config.on_missing_spec = value;
         else errors.push("on_missing_spec must be fail, close or allow");
         break;
+      case "demand": {
+        const d = value;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          for (const k of Object.keys(d)) if (!["enabled", "top"].includes(k)) errors.push(`unknown key: demand.${k}`);
+          if (d.enabled !== void 0) {
+            if (typeof d.enabled === "boolean") config.demand.enabled = d.enabled;
+            else errors.push("demand.enabled must be true or false");
+          }
+          if (d.top !== void 0) {
+            if (typeof d.top === "number" && Number.isInteger(d.top) && d.top >= 0) config.demand.top = d.top;
+            else errors.push("demand.top must be a whole number, 0 or more");
+          }
+        } else errors.push("demand must be a mapping");
+        break;
+      }
       case "dashboard": {
         const d = value;
         if (d && typeof d === "object") {
@@ -9343,9 +9367,9 @@ function loadConfig(text) {
 // src/find.ts
 function parseView(query, known) {
   const p = new URLSearchParams(query);
-  const pick = (key, list2) => {
+  const pick = (key, list3) => {
     const v = p.get(key);
-    return v !== null && list2.includes(v) ? v : null;
+    return v !== null && list3.includes(v) ? v : null;
   };
   return { q: p.get("q") ?? "", status: pick("status", known.statuses) ?? "", horizon: pick("horizon", known.horizons), top: pick("top", known.tops) ?? "" };
 }
@@ -9433,7 +9457,10 @@ ${visible.toString()}
   }
   function jump() {
     var a = anchor(), n = a && document.getElementById("spec-" + a);
-    if (n) n.scrollIntoView();
+    if (!n) return;
+    var d = n.querySelector(":scope > details");
+    if (d) d.open = true;
+    n.scrollIntoView();
   }
   form.hidden = false;
   form.addEventListener("input", changed);
@@ -9445,6 +9472,99 @@ ${visible.toString()}
   apply(first);
   jump();
 })(${parseView.name}, ${writeView.name}, ${visible.name});`;
+}
+
+// src/markdown.ts
+var esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function linkTarget(href, resolve) {
+  const h = href.trim();
+  if (/^(https?:\/\/|mailto:)/i.test(h)) return h;
+  if (!h || h.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith("//")) return null;
+  return resolve(h.replace(/^(\.?\/)+/, ""));
+}
+function inlineMarkdown(text, resolve) {
+  const code = [];
+  let s = esc(text).replace(/`([^`]+)`/g, (_, c) => `\0${code.push(c) - 1}\0`);
+  s = s.replace(/\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))*)\)/g, (_, label, href) => {
+    const raw = href.replace(/&(amp|lt|gt|quot);/g, (_2, e) => ({ amp: "&", lt: "<", gt: ">", quot: '"' })[e]);
+    const to = linkTarget(raw, resolve);
+    return to ? `<a href="${esc(to)}">${label}</a>` : label;
+  });
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^\w*])\*([^*\s][^*]*)\*(?!\w)/g, "$1<em>$2</em>");
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${code[Number(i)]}</code>`);
+}
+function list(items, resolve) {
+  const base = items[0].indent;
+  let out = "";
+  let tag = "";
+  for (let i = 0; i < items.length; ) {
+    const want = items[i].ordered ? "ol" : "ul";
+    if (want !== tag) out += `${tag ? `</${tag}>` : ""}<${tag = want}>`;
+    let j = i + 1;
+    while (j < items.length && items[j].indent > base) j++;
+    out += `<li>${inlineMarkdown(items[i].text, resolve)}${j > i + 1 ? list(items.slice(i + 1, j), resolve) : ""}</li>`;
+    i = j;
+  }
+  return `${out}</${tag}>`;
+}
+var ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+var cells = (line) => line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+function renderMarkdown(src, resolve) {
+  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  const out = [];
+  const starts = (l) => /^(#{1,6}\s|```|>|\|)/.test(l) || ITEM.test(l);
+  for (let i = 0; i < lines.length; ) {
+    const line = lines[i];
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+    if (line.startsWith("```")) {
+      const body = [];
+      for (i++; i < lines.length && !lines[i].startsWith("```"); i++) body.push(lines[i]);
+      i++;
+      out.push(`<pre><code>${esc(body.join("\n"))}</code></pre>`);
+      continue;
+    }
+    const h = /^(#{1,6})\s+(.*?)\s*#*$/.exec(line);
+    if (h) {
+      const level = h[1].length <= 2 ? 4 : h[1].length === 3 ? 5 : 6;
+      out.push(`<h${level}>${inlineMarkdown(h[2], resolve)}</h${level}>`);
+      i++;
+      continue;
+    }
+    if (line.trim().startsWith("|") && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      const head = cells(line);
+      const rows = [];
+      for (i += 2; i < lines.length && lines[i].trim().startsWith("|"); i++) rows.push(cells(lines[i]));
+      out.push(
+        `<table><thead><tr>${head.map((c) => `<th>${inlineMarkdown(c, resolve)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${head.map((_, k) => `<td>${inlineMarkdown(r[k] ?? "", resolve)}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+      );
+      continue;
+    }
+    if (ITEM.test(line)) {
+      const items = [];
+      for (; i < lines.length; i++) {
+        const m = ITEM.exec(lines[i]);
+        if (m) items.push({ indent: m[1].length, ordered: /\d/.test(m[2]), text: m[3] });
+        else if (lines[i].trim() && /^\s+/.test(lines[i]) && !lines[i].trim().startsWith("```")) items[items.length - 1].text += " " + lines[i].trim();
+        else if (!lines[i].trim() && i + 1 < lines.length && (ITEM.test(lines[i + 1]) || /^\s+\S/.test(lines[i + 1])) && !lines[i + 1].trim().startsWith("```")) continue;
+        else break;
+      }
+      out.push(list(items, resolve));
+      continue;
+    }
+    if (line.startsWith(">")) {
+      const body = [];
+      for (; i < lines.length && lines[i].startsWith(">"); i++) body.push(lines[i].replace(/^>\s?/, ""));
+      out.push(`<blockquote>${inlineMarkdown(body.join(" "), resolve)}</blockquote>`);
+      continue;
+    }
+    const para = [];
+    for (; i < lines.length && lines[i].trim() && !(para.length && starts(lines[i])); i++) para.push(lines[i].trim());
+    out.push(`<p>${inlineMarkdown(para.join(" "), resolve)}</p>`);
+  }
+  return out.join("\n");
 }
 
 // src/tree.ts
@@ -9531,6 +9651,22 @@ function levelName(id, levels) {
 }
 
 // src/dashboard.ts
+var THREAD_LABEL = "spectree";
+var demandOf = (reactions) => ({ up: Number(reactions?.["+1"] ?? 0), down: Number(reactions?.["-1"] ?? 0) });
+var TEMPLATE = `---
+title: "What it does, in a few words"
+paths:
+  - src/**
+criteria:
+  - id: first
+    text: "One thing that is true when this is built."
+    tests: [test/first.test.ts]
+---
+
+Why this is needed, in a paragraph.
+
+Not in this spec: what it leaves out.
+`;
 function summaryOf(body, max = 360) {
   const para = body.split(/\r?\n\s*\r?\n/).map((p) => p.trim()).find((p) => p && !/^(#|```|[-*+] |\d+\. |\||>)/.test(p));
   if (!para) return "";
@@ -9567,7 +9703,7 @@ function overviewOf(roots) {
   );
   return { horizons, rows, all };
 }
-function buildData(mainSpecs, prs, cfg, repository, now) {
+function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
   const flat = /* @__PURE__ */ new Map();
   const make = (id, title, kind, status, body, criteria, horizon = "") => ({
     id,
@@ -9581,6 +9717,10 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     counts: zero(),
     summary: summaryOf(body),
     criteria,
+    body,
+    up: 0,
+    down: 0,
+    thread: "",
     children: []
   });
   for (const s of Object.values(mainSpecs))
@@ -9637,30 +9777,42 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     return n.counts;
   };
   roots.forEach(roll);
-  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, proposals, overview: overviewOf(roots), tree: roots };
+  const wanted = [];
+  if (cfg.demand.enabled) {
+    for (const node of flat.values()) {
+      const t = extra.threads?.[node.id];
+      if (t) node.thread = t.url;
+      const d = mainSpecs[node.id] ? t : extra.reactions?.[node.open.find((o) => o.change === "added")?.pr ?? -1] ?? t;
+      if (d) node.up = d.up, node.down = d.down;
+      if (node.up > 0 && node.status !== "done") wanted.push({ id: node.id, title: node.title, up: node.up });
+    }
+    wanted.sort((a, b) => b.up - a.up || (a.id < b.id ? -1 : 1));
+    wanted.length = Math.min(wanted.length, cfg.demand.top);
+  }
+  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, proposals, overview: overviewOf(roots), tree: roots };
 }
-var esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-var inline = (s) => esc(s).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+var esc2 = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+var inline = (s) => esc2(s).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 var LABEL = { done: "Done", planned: "Planned", in_progress: "In progress", approved: "Approved", proposed: "Proposed" };
 var ORDER = ["done", "in_progress", "approved", "proposed", "planned"];
-var pill = (s, text = LABEL[s]) => `<span class="pill ${s}">${esc(text)}</span>`;
+var pill = (s, text = LABEL[s]) => `<span class="pill ${s}">${esc2(text)}</span>`;
 var plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 var STAGES = ["in_progress", "approved", "proposed"];
 function renderOverview(o, first) {
   if (!o.rows.length) return "";
-  const num = (n, top, status, horizon) => `<td class="num">${n ? `<a href="?${esc(writeView({ q: "", status, horizon, top }))}#specs">${n}</a>` : ""}</td>`;
+  const num = (n, top, status, horizon) => `<td class="num">${n ? `<a href="?${esc2(writeView({ q: "", status, horizon, top }))}#specs">${n}</a>` : ""}</td>`;
   const row = (r) => {
     const pct = r.total ? Math.round(r.counts.done / r.total * 100) : 0;
-    const name = r.id ? `<a href="#spec-${esc(r.id)}">${esc(r.title)}</a>` : esc(r.title);
+    const name = r.id ? `<a href="#spec-${esc2(r.id)}">${esc2(r.title)}</a>` : esc2(r.title);
     return `<tr${r.id ? "" : ' class="all"'}><th scope="row">${name}</th><td class="progress"><span class="bar"><span style="width:${pct}%"></span></span> ${r.counts.done} of ${r.total} done</td>${STAGES.map(
       (s) => num(r.counts[s], r.id, s, null)
     ).join("")}${o.horizons.map((h) => num(r.horizons[h] ?? 0, r.id, "", h)).join("")}</tr>`;
   };
   const stages = STAGES.map((s) => `<th class="num stage"${o.horizons.length ? ' rowspan="2"' : ""}>${LABEL[s]}</th>`).join("");
   const span = o.horizons.length ? ' rowspan="2"' : "";
-  const planned = o.horizons.length ? `<th class="num group" colspan="${o.horizons.length}">Planned</th></tr><tr>${o.horizons.map((h) => `<th class="num">${esc(h || "no horizon")}</th>`).join("")}` : "";
+  const planned = o.horizons.length ? `<th class="num group" colspan="${o.horizons.length}">Planned</th></tr><tr>${o.horizons.map((h) => `<th class="num">${esc2(h || "no horizon")}</th>`).join("")}` : "";
   return `<h2>Overview</h2>
-<div class="box"><table class="overview"><thead><tr><th${span}>${esc(first)}</th><th${span}>Progress</th>${stages}${planned}</tr></thead><tbody>${o.rows.map(row).join("")}${row(o.all)}</tbody></table></div>`;
+<div class="box"><table class="overview"><thead><tr><th${span}>${esc2(first)}</th><th${span}>Progress</th>${stages}${planned}</tr></thead><tbody>${o.rows.map(row).join("")}${row(o.all)}</tbody></table></div>`;
 }
 var HORIZON_CLASS = { now: "now", next: "next", later: "later" };
 var bar = (done, total) => `<span class="bar"><span style="width:${total ? Math.round(done / total * 100) : 0}%"></span></span>`;
@@ -9674,26 +9826,26 @@ var STEP_TITLE = {
 };
 var days = (n) => n === 0 ? "today" : n === 1 ? "1 day" : `${n} days`;
 function renderSpecs(nodes) {
-  const codes = nodes.map((n) => `<code>${esc(n)}</code>`).join(" ");
+  const codes = nodes.map((n) => `<code>${esc2(n)}</code>`).join(" ");
   if (nodes.length <= 3) return `<div>${codes}</div>`;
   const parts = nodes.map((n) => n.split("/"));
   let shared = 0;
   while (parts.every((p) => p.length > shared + 1 && p[shared] === parts[0][shared])) shared++;
-  const where = shared ? ` in <code>${esc(parts[0].slice(0, shared).join("/"))}</code>` : "";
+  const where = shared ? ` in <code>${esc2(parts[0].slice(0, shared).join("/"))}</code>` : "";
   return `<details class="specs"><summary>${nodes.length} specs${where}</summary>${codes}</details>`;
 }
 function renderQueue(data) {
   if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
   const row = (p) => {
     const age = p.opened ? ` \xB7 opened ${p.days ? days(p.days) + " ago" : "today"}${p.days_in_step !== p.days ? ` \xB7 ${p.days_in_step ? days(p.days_in_step) : "since today"} in this step` : ""}` : "";
-    return `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
+    return `<tr><td><a href="${p.url}">#${p.number} ${esc2(p.title)}</a><div class="muted">by ${esc2(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
       p,
       data.threshold
     )}</td><td>${renderNext(p)}</td></tr>`;
   };
   const groups = STEPS.map((step) => {
-    const list2 = data.proposals.filter((p) => p.next === step).sort((a, b) => b.days_in_step - a.days_in_step || a.number - b.number);
-    return list2.length ? `<tbody data-step="${step}"><tr class="step"><th colspan="4">${STEP_TITLE[step]} <span class="muted">${list2.length}</span></th></tr>${list2.map(row).join("")}</tbody>` : "";
+    const list3 = data.proposals.filter((p) => p.next === step).sort((a, b) => b.days_in_step - a.days_in_step || a.number - b.number);
+    return list3.length ? `<tbody data-step="${step}"><tr class="step"><th colspan="4">${STEP_TITLE[step]} <span class="muted">${list3.length}</span></th></tr>${list3.map(row).join("")}</tbody>` : "";
   }).join("");
   return `<table class="queue"><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead>${groups}</table>`;
 }
@@ -9705,42 +9857,81 @@ var NEXT = {
   merge: "Merge"
 };
 var CONTRIBUTING = "https://github.com/beamreach-ai/spectree/blob/main/docs/contributing-with-specs.md";
-function renderDetail(n) {
-  const where = `<p class="muted where"><span class="level">${esc(n.level)}</span> <code>${esc(n.id)}</code></p>`;
+var enc = encodeURIComponent;
+var newSpecUrl = (c, under) => `${c.repoUrl}/new/${enc(c.branch)}?filename=${enc(`${c.root}/${under ? under + "/" : ""}new-spec/spec.md`)}&value=${enc(TEMPLATE)}`;
+function renderMore(n, c) {
+  const specPath = `${c.root}/${n.id}/spec.md`;
+  const adds = n.open.find((o) => o.change === "added");
+  const inMain = !adds;
+  const whole = n.body.trim() && n.body.replace(/\s+/g, " ").trim() !== n.summary ? `<details class="whole"><summary>The whole spec</summary><div class="md">${renderMarkdown(n.body, (p) => `${c.repoUrl}/blob/${enc(c.branch)}/${p}`)}</div></details>` : "";
+  const stands = [n.status === "planned" && n.horizon ? `Planned: ${esc2(n.horizon)}` : LABEL[n.status]];
+  if (adds) stands.push(`proposed in <a href="${c.repoUrl}/pull/${adds.pr}">#${adds.pr}</a>, not in the default branch yet`);
+  for (const o of n.open) {
+    const p = c.prs.get(o.pr);
+    const tally2 = p ? `: ${p.for} of ${c.threshold} for, ${p.against} against` : "";
+    if (o !== adds) stands.push(`<a href="${c.repoUrl}/pull/${o.pr}">#${o.pr}</a> proposes to ${o.change === "removed" ? "remove it" : "change it"}${tally2}; the text here is the default branch's`);
+    else if (tally2) stands.push(`vote${tally2}`);
+  }
+  if (c.demand && (n.up || n.down)) stands.push(`${n.up} \u{1F44D}${n.down ? `, ${n.down} \u{1F44E}` : ""}`);
+  const act = [];
+  const link = (href, text, title = "") => act.push(`<a href="${esc2(href)}"${title ? ` title="${esc2(title)}"` : ""}>${text}</a>`);
+  const editUrl = `${c.repoUrl}/edit/${enc(c.branch)}/${specPath}`;
+  if (inMain) {
+    link(editUrl, "Edit", "Opens GitHub's editor; saving proposes the change in a pull request");
+    if (c.demand)
+      link(
+        n.thread || `${c.repoUrl}/issues/new?title=${enc(n.id)}&labels=${THREAD_LABEL}&body=${enc(`The thread of the spec \`${n.id}\`: ${c.repoUrl}/blob/${c.branch}/${specPath}
+
+A \u{1F44D} on this post says you want it. Discussion goes below.`)}`,
+        n.thread ? "Discuss or \u{1F44D}" : "Start its thread",
+        "A thumbs-up on the thread's first post says you want this spec"
+      );
+    link(newSpecUrl(c, n.id), "Add a spec below");
+    if (n.kind === "leaf" && n.status === "planned") link(editUrl, "Build this", "Remove planned, add paths and criteria, and bring the code in the same pull request");
+  } else {
+    link(`${c.repoUrl}/pull/${adds.pr}/files`, "Edit", "The spec is in this pull request; changes go there");
+    link(`${c.repoUrl}/pull/${adds.pr}`, c.demand ? "Discuss or \u{1F44D}" : "Discuss", "A thumbs-up on the pull request's description says you want this spec");
+    if (n.kind === "leaf" && n.status === "approved") link(`${c.repoUrl}/pull/${adds.pr}`, "Take it", `Write the code in that pull request, or in your own whose description says Implements: #${adds.pr}`);
+  }
+  return `${whole}<p class="muted stands">${stands.join(" \xB7 ")}</p><p class="actions">${act.join(" ")}</p>`;
+}
+function renderDetail(n, c) {
+  const where = `<p class="muted where"><span class="level">${esc2(n.level)}</span> <code>${esc2(n.id)}</code></p>`;
   const summary = n.summary ? `<p>${inline(n.summary)}</p>` : "";
-  const criteria = n.criteria.length ? `<ol class="criteria">${n.criteria.map((c) => `<li><span>${inline(c.text)}</span> <span class="muted">Tested in ${c.tests.map((t) => `<code>${esc(t)}</code>`).join(", ")}</span></li>`).join("")}</ol>` : "";
-  return `<div class="detail">${where}${summary}${criteria}</div>`;
+  const criteria = n.criteria.length ? `<ol class="criteria">${n.criteria.map((c2) => `<li><span>${inline(c2.text)}</span> <span class="muted">Tested in ${c2.tests.map((t) => `<code>${esc2(t)}</code>`).join(", ")}</span></li>`).join("")}</ol>` : "";
+  return `<div class="detail">${where}${summary}${criteria}${renderMore(n, c)}</div>`;
 }
 function renderFind(data) {
   if (!data.tree.length) return "";
-  const option = (value, text) => `<option value="${esc(value)}">${esc(text)}</option>`;
+  const option = (value, text) => `<option value="${esc2(value)}">${esc2(text)}</option>`;
   const o = data.overview;
   const horizon = o.horizons.length ? `<select name="horizon" aria-label="Horizon">${option("", "Any horizon")}${o.horizons.map((h) => option(`h:${h}`, h || "no horizon")).join("")}</select>` : "";
   return `<form class="find" id="find" role="search" hidden><input type="search" name="q" placeholder="Search specs\u2026" aria-label="Search specs" autocomplete="off"><select name="status" aria-label="Status">${option(
     "",
     "Any status"
-  )}${ORDER.map((s) => option(s, LABEL[s])).join("")}</select>${horizon}<select name="top" aria-label="${esc(data.levels[0] ?? "spec")}">${option(
+  )}${ORDER.map((s) => option(s, LABEL[s])).join("")}</select>${horizon}<select name="top" aria-label="${esc2(data.levels[0] ?? "spec")}">${option(
     "",
     `Any ${data.levels[0] ?? "spec"}`
   )}${o.rows.map((r) => option(r.id, r.title)).join("")}</select><span class="muted" id="find-count" aria-live="polite"></span><button type="reset" id="find-clear" hidden>Clear</button></form>`;
 }
-function renderNode(n, repoUrl, root, closed) {
+function renderNode(n, c) {
+  const { repoUrl, root, closed } = c;
   const total = ORDER.reduce((a, s) => a + n.counts[s], 0);
   const counts = n.kind === "group" ? `${bar(n.counts.done, total)}<span class="muted">${n.counts.done} of ${total} done</span> ${STAGES.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ")}${n.counts.planned ? ` <span class="muted">${n.counts.planned} planned</span>` : ""}` : "";
-  const mark = n.status !== "planned" ? pill(n.status) : `<span class="pill hz hz-${HORIZON_CLASS[n.horizon] ?? "other"}">${esc(n.horizon || "Planned")}</span>`;
+  const mark = n.status !== "planned" ? pill(n.status) : `<span class="pill hz hz-${HORIZON_CLASS[n.horizon] ?? "other"}">${esc2(n.horizon || "Planned")}</span>`;
   const open = n.open.map((o) => `<a class="pr" href="${repoUrl}/pull/${o.pr}">#${o.pr} ${o.change === "added" ? "" : o.change + ", "}${LABEL[o.status].toLowerCase()}</a>`).join(" ");
   const inMain = (n.status === "done" || n.status === "planned") && !n.open.some((o) => o.change === "added");
   const href = inMain ? `${repoUrl}/blob/HEAD/${root}/${n.id}/spec.md` : n.open[0] ? `${repoUrl}/pull/${n.open[0].pr}` : "#";
   const many = n.criteria.length ? `<span class="muted">${plural(n.criteria.length, "criterion", "criteria")}</span>` : "";
-  const head = `<a class="title" title="${esc(n.title)}" href="${href}">${esc(n.title)}</a> ${n.kind === "leaf" ? mark : counts} ${inMain || n.kind === "group" ? open : ""} ${many}`;
-  const detail = renderDetail(n);
-  const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root, closed)).join("")}</ul>` : "";
+  const head = `<a class="title" title="${esc2(n.title)}" href="${href}">${esc2(n.title)}</a> ${n.kind === "leaf" ? mark : counts} ${inMain || n.kind === "group" ? open : ""} ${many}${c.demand && n.up ? ` <span class="want" title="${plural(n.up, "person wants", "people want")} this">\u{1F44D} ${n.up}</span>` : ""}`;
+  const detail = renderDetail(n, c);
+  const kids = n.children.length ? `<ul>${n.children.map((k) => renderNode(k, c)).join("")}</ul>` : "";
   const text = `${n.title} ${n.id} ${n.summary}`.toLowerCase();
-  const li = `<li class="node" id="spec-${esc(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc(n.horizon)}" data-text="${esc(text)}">`;
+  const li = `<li class="node" id="spec-${esc2(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc2(n.horizon)}" data-text="${esc2(text)}">`;
   return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
 }
 function renderVotes(p, threshold) {
-  const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
+  const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc2(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
   if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return "<div>Approved</div>";
   const lines = [`<div>${p.for} of ${threshold} for, ${p.against} against</div>`];
   if (who("for")) lines.push(`<div class="muted">For: ${who("for")}</div>`);
@@ -9764,14 +9955,25 @@ function renderHtml(data, cfg, serverUrl = "https://github.com") {
   const over = cfg.dashboard.collapse_over;
   const closed = over > 0 && data.overview.all.total > over;
   const known = { statuses: ORDER, horizons: data.overview.horizons, tops: data.overview.rows.map((r) => r.id) };
+  const ctx = {
+    repoUrl,
+    root: cfg.root,
+    closed,
+    branch: data.branch,
+    demand: cfg.demand.enabled,
+    threshold: data.threshold,
+    prs: new Map(data.proposals.map((p) => [p.number, p]))
+  };
+  const wanted = data.wanted.length ? `<h2>Most wanted</h2>
+<ol class="wanted">${data.wanted.map((w) => `<li><a href="#spec-${esc2(w.id)}">${esc2(w.title)}</a> <span class="want">\u{1F44D} ${w.up}</span></li>`).join("")}</ol>` : "";
   const proposals = renderQueue(data);
   const fresh = !data.tree.length && !data.proposals.length;
-  const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root, closed)).join("")}</ul>` : `<div class="empty"><p><strong>No specs yet.</strong> A spec is a file, <code>${esc(cfg.root)}/&lt;name&gt;/spec.md</code>, that says what one part of the project does and names the tests that prove it. Add the first one in a pull request.</p><p>To check the tree on your machine:</p><pre>npx github:beamreach-ai/spectree validate
+  const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, ctx)).join("")}</ul>` : `<div class="empty"><p><strong>No specs yet.</strong> A spec is a file, <code>${esc2(cfg.root)}/&lt;name&gt;/spec.md</code>, that says what one part of the project does and names the tests that prove it. Add the first one in a pull request.</p><p>To check the tree on your machine:</p><pre>npx github:beamreach-ai/spectree validate
 npx github:beamreach-ai/spectree tree</pre></div>`;
   const against = data.max_against === 0 ? "none against" : `at most ${data.max_against} against`;
-  const intro = `<details class="how" id="how" open><summary>How changes are made here</summary><ol class="steps"><li><strong>Propose.</strong> Every change to ${esc(
+  const intro = `<details class="how" id="how" open><summary>How changes are made here</summary><ol class="steps"><li><strong>Propose.</strong> Every change to ${esc2(
     name
-  )} starts as a spec under <code>${esc(cfg.root)}/</code>, proposed in a pull request.</li><li><strong>Vote.</strong> People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
+  )} starts as a spec under <code>${esc2(cfg.root)}/</code>, proposed in a pull request.</li><li><strong>Vote.</strong> People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
     data.threshold,
     "weighted vote"
   )} for and ${against}. People with write access weigh 1, and everyone else's vote is shown.</li><li><strong>Build.</strong> After the vote, the code is added to the same pull request and spec and code merge together.</li></ol><p class="muted"><a href="${CONTRIBUTING}">How to propose a spec and vote</a>.</p></details>`;
@@ -9788,8 +9990,8 @@ npx github:beamreach-ai/spectree tree</pre></div>`;
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(name)} roadmap</title>
-<meta name="description" content="The roadmap of ${esc(data.repository)}: every spec, its status, and the open proposals with their votes.">
+<title>${esc2(name)} roadmap</title>
+<meta name="description" content="The roadmap of ${esc2(data.repository)}: every spec, its status, and the open proposals with their votes.">
 <style>
 :root{--bg:#fbfcfd;--fg:#14202b;--muted:#5b6b79;--line:#dce4ea;--card:#fff;--link:#00699f;
 --done:#1d7a4f;--done-bg:#e3f4ea;--prog:#8a5a00;--prog-bg:#fdf0d2;--appr:#00699f;--appr-bg:#e1f1fa;--prop:#5b4bb5;--prop-bg:#ece9fb;--bad:#a8323a;--bad-bg:#fbe6e7}
@@ -9813,6 +10015,16 @@ a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .hz{color:var(--muted);background:var(--line)}.hz::before{content:"\u25CF ";font-size:10px;vertical-align:1px}
 .hz-now{color:var(--done);background:var(--done-bg)}.hz-next{color:var(--appr);background:var(--appr-bg)}.hz-later{color:var(--muted);background:var(--line)}.hz-other{color:var(--prog);background:var(--prog-bg)}
 .where{margin:4px 0}
+.button{display:inline-block;padding:6px 14px;border-radius:8px;background:var(--link);color:var(--bg);font-weight:600;font-size:15px}.button:hover{text-decoration:none;opacity:.9}
+.want{font-size:13px;white-space:nowrap}
+.wanted{margin:0;padding-left:24px;list-style:decimal}.wanted li{margin:4px 0}
+.actions{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}.actions a{font-weight:600}
+.stands{margin:8px 0 4px}
+.whole>summary{font-size:14px;font-weight:600;color:var(--link)}.whole>summary::before{content:"\u25B8 "}.whole[open]>summary::before{content:"\u25BE "}
+.md{font-size:15px;overflow-x:auto}.md h4,.md h5,.md h6{margin:14px 0 4px;font-size:15px}.md ul,.md ol,.tree .md ul{margin:6px 0;padding-left:22px;list-style:revert;border-left:0}.md li{margin:3px 0}
+.md pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto}.md pre code{color:var(--fg)}
+.md table{min-width:0;width:auto}.md th,.md td{padding:6px 14px 6px 0;font-size:14px;width:auto}.md td:first-child,.md td:last-child{width:auto}
+.md blockquote{margin:6px 0;padding-left:12px;border-left:3px solid var(--line);color:var(--muted)}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .pill.done{color:var(--done);background:var(--done-bg)}.pill.in_progress{color:var(--prog);background:var(--prog-bg)}
@@ -9860,16 +10072,18 @@ table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:aut
 </head>
 <body>
 <main>
-<h1>${esc(name)} roadmap</h1>
-<div class="muted"><a href="${repoUrl}">${esc(data.repository)}</a></div>
+<h1>${esc2(name)} roadmap</h1>
+<div class="muted"><a href="${repoUrl}">${esc2(data.repository)}</a></div>
+<p><a class="button" href="${esc2(newSpecUrl(ctx, ""))}">Propose a spec</a></p>
 ${intro}
+${wanted}
 ${renderOverview(data.overview, first)}
 ${fresh ? "" : `<h2>Open proposals</h2>
 <div class="box">${proposals}</div>`}
 <h2 id="specs">Specs</h2>
 ${renderFind(data)}
 <div class="box">${tree}</div>
-<footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
+<footer class="muted">Updated ${esc2(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
 ${data.tree.length ? `<script>
 ${findScript(known)}
@@ -9922,7 +10136,7 @@ var LABEL_NO_SPEC = "no-spec";
 var ok = (description) => ({ state: "success", description });
 var fail = (description) => ({ state: "failure", description });
 var wait = (description) => ({ state: "pending", description });
-var list = (items, max = 3) => items.slice(0, max).join(", ") + (items.length > max ? ` and ${items.length - max} more` : "");
+var list2 = (items, max = 3) => items.slice(0, max).join(", ") + (items.length > max ? ` and ${items.length - max} more` : "");
 var plural2 = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 var matcher = (globs) => globs.length ? (0, import_picomatch.default)(globs, { dot: true }) : () => false;
 function implementsRef(body) {
@@ -10060,8 +10274,8 @@ function evaluatePr(input, cfg) {
             if (![...present].some((p) => hit(p))) missingTests.push(`${t} (${id}, criterion ${c.id})`);
           }
     }
-    if (outside.length) scope = fail(`${plural2(outside.length, "file")} outside the spec's paths: ${list(outside)}`);
-    else if (missingTests.length) scope = fail(`${plural2(missingTests.length, "test")} named by the spec ${missingTests.length === 1 ? "does" : "do"} not exist: ${list(missingTests, 2)}`);
+    if (outside.length) scope = fail(`${plural2(outside.length, "file")} outside the spec's paths: ${list2(outside)}`);
+    else if (missingTests.length) scope = fail(`${plural2(missingTests.length, "test")} named by the spec ${missingTests.length === 1 ? "does" : "do"} not exist: ${list2(missingTests, 2)}`);
     else scope = ok(`${plural2(codeFiles.length, "file")} inside the spec's paths, every criterion names an existing test`);
   }
   const next = errors.length ? "Fix the spec. The vote starts when it is valid." : phase === "spec" ? hasCode ? "Remove the code from this pull request until the vote passes." : 'Vote with a review: "Approve" is for, "Request changes" is against.' : phase === "approved" ? needCode.length ? "The spec is frozen. Add the code to this pull request." : "This pull request can merge." : "The spec is frozen. The code goes through normal review.";
@@ -10170,6 +10384,7 @@ async function run(o) {
     return canWrite.get(k);
   };
   const summaries = [];
+  const extra = { branch: o.defaultBranch, threads: {}, reactions: {} };
   let failed = 0;
   for (const pull of await o.gh.openPulls(o.defaultBranch)) {
     const n = pull.number;
@@ -10235,6 +10450,13 @@ async function run(o) {
       if (result.removeLabel) await o.gh.removeLabel(n, LABEL_APPROVED);
       if (result.close) await o.gh.closePull(n);
       o.log(`#${n} ${result.phase}: spec ${result.statuses.spec.state}, phase ${result.statuses.phase.state}, scope ${result.statuses.scope.state}`);
+      if (cfg.demand.enabled && cfg.dashboard.enabled && touchesRoot) {
+        try {
+          extra.reactions[n] = demandOf((await o.gh.issue(n)).reactions);
+        } catch (e) {
+          o.log(`::warning::#${n}: demand could not be read: ${e.message}`);
+        }
+      }
       summaries.push({ number: n, title: pull.title, author, url: pull.html_url, opened: pull.created_at ?? "", result });
     } catch (e) {
       failed++;
@@ -10242,7 +10464,20 @@ async function run(o) {
     }
   }
   if (cfg.dashboard.enabled) {
-    const data = buildData(main2.specs, summaries, cfg, `${o.gh.owner}/${o.gh.repo}`, o.now);
+    if (cfg.demand.enabled) {
+      try {
+        await o.gh.ensureLabel(THREAD_LABEL, "5b4bb5", "The thread of a spec: discussion, and a thumbs-up to say you want it");
+        const open = new Set(summaries.flatMap((s) => s.result.nodes.map((x) => x.id)));
+        for (const i of (await o.gh.issuesLabeled(THREAD_LABEL)).sort((a, b) => a.number - b.number)) {
+          const id = String(i.title ?? "").trim().replace(/^`|`$/g, "");
+          if (!main2.specs[id] && !open.has(id)) o.log(`thread #${i.number} "${id}" matches no spec; ignored`);
+          else if (!extra.threads[id]) extra.threads[id] = { number: i.number, url: i.html_url, ...demandOf(i.reactions) };
+        }
+      } catch (e) {
+        o.log(`::warning::demand could not be read: ${e.message}`);
+      }
+    }
+    const data = buildData(main2.specs, summaries, cfg, `${o.gh.owner}/${o.gh.repo}`, o.now, extra);
     const dir = cfg.dashboard.path ? (0, import_node_path.join)(o.siteDir, cfg.dashboard.path) : o.siteDir;
     (0, import_node_fs.mkdirSync)(dir, { recursive: true });
     (0, import_node_fs.writeFileSync)((0, import_node_path.join)(dir, "index.html"), renderHtml(data, cfg, o.serverUrl));

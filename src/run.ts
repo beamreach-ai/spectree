@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Config, loadConfig } from "./config.ts";
-import { type PrSummary, buildData, renderHtml } from "./dashboard.ts";
+import { type Extra, type PrSummary, THREAD_LABEL, buildData, demandOf, renderHtml } from "./dashboard.ts";
 import { type ApprovalRecord, type PrInput, type PrResult, LABEL_APPROVED, evaluatePr, implementsRef } from "./evaluate.ts";
 import type { GitHub } from "./github.ts";
 import { weightOf } from "./tally.ts";
@@ -100,6 +100,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
   };
 
   const summaries: PrSummary[] = [];
+  const extra: Extra = { branch: o.defaultBranch, threads: {}, reactions: {} };
   let failed = 0;
   for (const pull of await o.gh.openPulls(o.defaultBranch)) {
     const n: number = pull.number;
@@ -157,6 +158,13 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
       if (result.removeLabel) await o.gh.removeLabel(n, LABEL_APPROVED);
       if (result.close) await o.gh.closePull(n);
       o.log(`#${n} ${result.phase}: spec ${result.statuses.spec.state}, phase ${result.statuses.phase.state}, scope ${result.statuses.scope.state}`);
+      if (cfg.demand.enabled && cfg.dashboard.enabled && touchesRoot) {
+        try {
+          extra.reactions![n] = demandOf((await o.gh.issue(n)).reactions);
+        } catch (e) {
+          o.log(`::warning::#${n}: demand could not be read: ${(e as Error).message}`);
+        }
+      }
       summaries.push({ number: n, title: pull.title, author, url: pull.html_url, opened: pull.created_at ?? "", result });
     } catch (e) {
       failed++;
@@ -165,7 +173,21 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
   }
 
   if (cfg.dashboard.enabled) {
-    const data = buildData(main.specs, summaries, cfg, `${o.gh.owner}/${o.gh.repo}`, o.now);
+    if (cfg.demand.enabled) {
+      // A spec's thread is the issue labelled spectree whose title is the spec's id. The first one opened wins.
+      try {
+        await o.gh.ensureLabel(THREAD_LABEL, "5b4bb5", "The thread of a spec: discussion, and a thumbs-up to say you want it");
+        const open = new Set(summaries.flatMap((s) => s.result.nodes.map((x) => x.id)));
+        for (const i of (await o.gh.issuesLabeled(THREAD_LABEL)).sort((a: any, b: any) => a.number - b.number)) {
+          const id = String(i.title ?? "").trim().replace(/^`|`$/g, "");
+          if (!main.specs[id] && !open.has(id)) o.log(`thread #${i.number} "${id}" matches no spec; ignored`);
+          else if (!extra.threads![id]) extra.threads![id] = { number: i.number, url: i.html_url, ...demandOf(i.reactions) };
+        }
+      } catch (e) {
+        o.log(`::warning::demand could not be read: ${(e as Error).message}`);
+      }
+    }
+    const data = buildData(main.specs, summaries, cfg, `${o.gh.owner}/${o.gh.repo}`, o.now, extra);
     const dir = cfg.dashboard.path ? join(o.siteDir, cfg.dashboard.path) : o.siteDir;
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "index.html"), renderHtml(data, cfg, o.serverUrl));

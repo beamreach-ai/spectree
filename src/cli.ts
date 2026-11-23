@@ -120,7 +120,7 @@ export function main(argv: string[], dir = process.cwd()): number {
     if (cmd === "preview") {
       const out = arg || "_spectree_site";
       mkdirSync(out, { recursive: true });
-      const data = buildData(specs, [], config, "local/preview", new Date().toISOString());
+      const data = buildData(specs, [], config, "local/preview", new Date().toISOString(), {});
       writeFileSync(join(out, "index.html"), renderHtml(data, config));
       writeFileSync(join(out, "roadmap.json"), JSON.stringify(data, null, 2) + "\n");
       console.log(`wrote ${out}/index.html`);
