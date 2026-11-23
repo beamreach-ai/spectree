@@ -6,7 +6,7 @@ Specs as a tree in your repository. A contribution starts as a spec, people vote
 
 AI made code cheap. Open-source maintainers now get more pull requests of lower quality, written from partial context or from no spec at all, while their time shrinks. Reading a 600-line pull request to find out the project never wanted the feature is the expensive way to say no.
 
-A spec is short. With spectree the maintainer first reads what a change is meant to do and decides on that. Code is reviewed only for changes the project already agreed to, and a check confirms the code stays inside what the spec allowed.
+A spec is short. With spectree the maintainer first reads what a change is meant to do and decides on that. Code is reviewed only for changes the project already agreed to. A check confirms the code stays inside what the spec allowed, and the code needs its own approval before it can merge.
 
 ## How it works
 
@@ -14,15 +14,17 @@ A spec is short. With spectree the maintainer first reads what a change is meant
 1. Spec phase     A pull request adds roadmap/<feature>/spec.md and nothing else.
 2. Vote           "Approve" is a vote for. "Request changes" is a vote against.
 3. Approval       The vote passes. The spec is frozen.
-4. Code phase     Code is pushed to the same pull request and reviewed as usual.
+4. Code phase     Code is pushed to the same pull request. It needs its own approval,
+                  given on the latest commit.
 5. Merge          Spec and code reach the default branch together.
 ```
 
 - **The roadmap is a directory tree.** Every directory under `roadmap/` with a `spec.md` is a node: epics, tasks, subtasks, to any depth.
 - **Votes are pull-request reviews**, or a comment that says `/spectree for` or `/spectree against`. GitHub stores them. Maintainers' votes have weight 1 and everyone else's have weight 0 by default, so outside votes are visible and maintainers decide.
+- **The code has its own approval.** It is counted like the vote, but only on the latest commit, so a push asks for it again. A maintainer's own code passes on their own weight; an outside contributor's code waits for a maintainer.
 - **Three checks** report on every pull request:
   - `spectree/spec`: is there an approved spec?
-  - `spectree/phase`: is code arriving only after approval?
+  - `spectree/phase`: is code arriving only after approval, and has the code itself been approved?
   - `spectree/scope`: does the code stay inside the paths the spec named, and does every acceptance criterion name a test that exists?
 - **A roadmap page** on GitHub Pages shows every spec as done, in progress, approved, proposed or planned. It opens with an overview by area and horizon and what changed lately, lists open proposals by what they wait for, and can be searched and filtered. Each spec opens to its whole text and links to GitHub's forms to edit it, build it or propose one below it.
 - **Demand is separate from the vote.** Anyone can add a 👍 to a spec's thread; the page shows the count and the most wanted specs. It never changes a vote.

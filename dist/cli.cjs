@@ -7378,6 +7378,7 @@ var DEFAULTS = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
+  review: { threshold: 1, count_author: true },
   demand: { enabled: true, top: 3 },
   dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 }
 };
@@ -7432,6 +7433,21 @@ function loadConfig(text) {
         if (value === "fail" || value === "close" || value === "allow") config.on_missing_spec = value;
         else errors.push("on_missing_spec must be fail, close or allow");
         break;
+      case "review": {
+        const d = value;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          for (const k of Object.keys(d)) if (!["threshold", "count_author"].includes(k)) errors.push(`unknown key: review.${k}`);
+          if (d.threshold !== void 0) {
+            if (typeof d.threshold === "number" && d.threshold >= 0) config.review.threshold = d.threshold;
+            else errors.push("review.threshold must be a number, 0 or more");
+          }
+          if (d.count_author !== void 0) {
+            if (typeof d.count_author === "boolean") config.review.count_author = d.count_author;
+            else errors.push("review.count_author must be true or false");
+          }
+        } else errors.push("review must be a mapping");
+        break;
+      }
       case "demand": {
         const d = value;
         if (d && typeof d === "object" && !Array.isArray(d)) {
@@ -7785,7 +7801,7 @@ function summaryOf(body, max = 360) {
 function nextOf(r) {
   if (r.errors.length) return "fix";
   if (r.phase === "spec") return "votes";
-  if (r.phase === "code") return "review";
+  if (r.phase === "code") return r.review?.passed && r.statuses.phase.state === "success" && r.statuses.scope.state === "success" ? "merge" : "review";
   return r.statuses.phase.state === "pending" ? "code" : "merge";
 }
 var statusOf = (phase) => phase === "code" ? "in_progress" : phase === "approved" ? "approved" : "proposed";
@@ -7887,7 +7903,8 @@ function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
       againstPeople: r.tally?.againstPeople ?? 0,
       next,
       votes: (r.tally?.votes ?? []).map(({ user, vote, weight }) => ({ user, vote, weight })),
-      nodes: r.nodes.map((n) => n.id)
+      nodes: r.nodes.map((n) => n.id),
+      review: r.review ? { for: r.review.for, against: r.review.against, needed: cfg.review.threshold, passed: r.review.passed } : null
     });
     for (const n of r.nodes) {
       const own = n.planned !== null && r.phase !== "spec" ? "planned" : status;
@@ -8080,18 +8097,19 @@ function renderNode(n, c) {
 }
 function renderVotes(p, threshold) {
   const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc2(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
-  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return "<div>Approved</div>";
-  const lines = [`<div>${p.for} of ${threshold} for, ${p.against} against</div>`];
+  const code = p.review ? `<div>Code: ${p.review.for} of ${p.review.needed} for, ${p.review.against} against</div>` : "";
+  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return `<div>${code ? "Spec approved" : "Approved"}</div>${code}`;
+  const lines = [`<div>${code ? "Spec: " : ""}${p.for} of ${threshold} for, ${p.against} against</div>`];
   if (who("for")) lines.push(`<div class="muted">For: ${who("for")}</div>`);
   if (who("against")) lines.push(`<div class="muted">Against: ${who("against")}</div>`);
-  return lines.join("");
+  return lines.join("") + code;
 }
 function renderNext(p) {
   const hint = {
     fix: "The spec has problems. The vote starts when it is valid.",
     votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
     code: "The spec is approved and frozen. The code goes in this pull request, or in another with <code>Implements: #" + p.number + "</code>.",
-    review: "The code is in. It is reviewed like any other code.",
+    review: p.review ? `<a href="${p.url}/files">Review the code</a>: Approve on the latest commit, or comment <code>/spectree for</code>.` : "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge."
   };
   return `<div class="next">${NEXT[p.next]}</div><div class="muted">${hint[p.next]}</div>`;
@@ -8254,8 +8272,8 @@ var HELP = [
   "",
   "| Comment | Effect |",
   "|---|---|",
-  "| `/spectree for` | a vote for, the same as an approving review |",
-  '| `/spectree against <reason>` | a vote against, the same as "Request changes" |',
+  "| `/spectree for` | a vote for, the same as an approving review. Once the spec is approved, it approves the code |",
+  '| `/spectree against <reason>` | a vote against, the same as "Request changes". Once the spec is approved, it is about the code |',
   "| `/spectree withdraw` | takes your vote back |",
   "| `/spectree take` | says you will write the code of an approved spec |",
   "| `/spectree status` | asks for the tally and what the pull request waits for |"

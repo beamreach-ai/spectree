@@ -25,6 +25,8 @@ export interface PrInput {
   reviews: Review[];
   /** For each review commit: is the spec there the same as at the head? */
   specUnchangedSince: Record<string, boolean>;
+  /** For each command vote: was it written after the workflow first saw the head commit? Reviews are matched by their commit. */
+  onHead?: Record<string, boolean>;
   /** Vote weight of the author and every reviewer. */
   weights: Record<string, number>;
   authorCanWrite: boolean;
@@ -65,6 +67,8 @@ export interface PrResult {
   /** The record to keep on the PR. Null when the spec is not approved. */
   record: ApprovalRecord | null;
   tally: Tally | null;
+  /** The code review, counted on the head commit. Null outside the code phase and when `review.threshold` is 0. */
+  review: Tally | null;
   digest: string | null;
   nodes: NodeChange[];
   errors: string[];
@@ -99,7 +103,7 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
   const codeFiles = input.files.filter((f) => !inRoot(f.path) && !exempt(f.path));
   const na = ok("Not applicable");
   const base: PrResult = {
-    phase: "none", statuses: { spec: na, phase: na, scope: na }, record: null, tally: null, digest: null, nodes: [], errors: [],
+    phase: "none", statuses: { spec: na, phase: na, scope: na }, record: null, tally: null, review: null, digest: null, nodes: [], errors: [],
     addLabel: false, removeLabel: input.labels.includes(LABEL_APPROVED), close: false, comment: null,
   };
 
@@ -190,6 +194,16 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
   const toBuild = leaves.filter((n) => n.change !== "removed" && n.planned === null);
   const needCode = toBuild.filter((n) => !built(n.id));
   const phase: Phase = approved ? (hasCode ? "code" : "approved") : "spec";
+  // The code has its own approval. It is given on the head commit, so any push asks for it again.
+  const review =
+    phase === "code" && cfg.review.threshold > 0
+      ? tally(input.reviews, {
+          author: input.author,
+          weight: (u) => input.weights[u.toLowerCase()] ?? 0,
+          specUnchangedSince: (c) => c === input.headSha || input.onHead?.[c] === true,
+          cfg: { ...cfg, threshold: cfg.review.threshold, max_against: 0, count_author: cfg.review.count_author },
+        })
+      : null;
 
   const spec: Status = errors.length
     ? fail(`The spec is not valid: ${errors[0]}${errors.length > 1 ? ` (and ${errors.length - 1} more)` : ""}`)
@@ -202,6 +216,8 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
   else if (!approved) phaseStatus = ok("Spec phase: waiting for the vote");
   else if (hasCode && cfg.implementation === "maintainers" && !input.authorCanWrite)
     phaseStatus = fail("In this project only maintainers write the code for an approved spec");
+  else if (review && !review.passed) phaseStatus = wait(`Code review open: ${review.for} of ${cfg.review.threshold} needed for, ${review.against} against`);
+  else if (review) phaseStatus = ok(`Code phase: spec approved, code reviewed (${review.for} for, ${review.against} against)`);
   else if (hasCode) phaseStatus = ok("Code phase: the spec is approved and frozen");
   else if (needCode.length) phaseStatus = wait("Spec approved. Add the code to this pull request");
   else if (toBuild.length) phaseStatus = ok("Spec approved. Its tests are already in the default branch, so it describes existing code");
@@ -242,10 +258,29 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
         ? needCode.length
           ? "The spec is frozen. Add the code to this pull request."
           : "This pull request can merge."
-        : "The spec is frozen. The code goes through normal review.";
-  const votes = shown.votes.length
-    ? shown.votes.map((v) => `- ${v.vote === "for" ? "For" : "Against"}: @${v.user}, weight ${v.weight}${v.author ? " (author)" : ""}`)
-    : ["- No votes yet"];
+        : !review
+          ? "The spec is frozen. The code goes through normal review."
+          : review.passed
+            ? "This pull request can merge."
+            : "The spec is frozen. The code needs an approving review of the latest commit from someone whose vote has weight.";
+  const voteLines = (t: Tally) =>
+    t.votes.length ? t.votes.map((v) => `- ${v.vote === "for" ? "For" : "Against"}: @${v.user}, weight ${v.weight}${v.author ? " (author)" : ""}`) : ["- No votes yet"];
+  const votes = voteLines(shown);
+  const reviewLines = review
+    ? [
+        `**Code review: ${review.passed ? "passed" : "open"}**`,
+        "",
+        "| | Weighted | People |",
+        "|---|---|---|",
+        `| For | ${review.for} of ${cfg.review.threshold} needed | ${review.forPeople} |`,
+        `| Against | ${review.against} (at most 0) | ${review.againstPeople} |`,
+        "",
+        ...voteLines(review),
+        "",
+        `Counted on commit ${input.headSha.slice(0, 7)}. A new commit asks for the review again.`,
+        "",
+      ]
+    : [];
   const comment = [
     `**Spec vote: ${errors.length ? "not started" : approved ? "passed" : "open"}**`,
     "",
@@ -259,11 +294,12 @@ export function evaluatePr(input: PrInput, cfg: Config): PrResult {
     ...(errors.length ? ["**Problems in the spec:**", ...errors.map((e) => `- ${e}`), ""] : []),
     ...(nodes.length ? ["**Specs in this pull request:**", ...nodes.map((n) => `- \`${n.id}\` (${n.planned !== null ? "planned " : ""}${n.kind}, ${n.change}): ${n.title}`), ""] : []),
     ...(record ? [`Approved at commit ${record.commit.slice(0, 7)}${record.pr !== input.number ? ` in #${record.pr}` : ""}, spec digest \`${record.digest.slice(0, 19)}\`.`, ""] : []),
+    ...reviewLines,
     `**Next:** ${next}`,
   ].join("\n");
 
   return {
-    phase, statuses: { spec, phase: phaseStatus, scope }, record, tally: shown, digest, nodes, errors,
+    phase, statuses: { spec, phase: phaseStatus, scope }, record, tally: shown, review, digest, nodes, errors,
     addLabel: approved && !input.labels.includes(LABEL_APPROVED),
     removeLabel: !approved && input.labels.includes(LABEL_APPROVED),
     close: false, comment,

@@ -11,6 +11,7 @@ export interface Config {
   exempt_paths: string[];
   exempt_authors: string[];
   on_missing_spec: "fail" | "close" | "allow";
+  review: { threshold: number; count_author: boolean };
   demand: { enabled: boolean; top: number };
   dashboard: { enabled: boolean; path: string; host: "github-pages" | "cloudflare"; project: string; collapse_over: number; stale_days: number; recent_days: number };
 }
@@ -26,6 +27,7 @@ export const DEFAULTS: Config = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
+  review: { threshold: 1, count_author: true },
   demand: { enabled: true, top: 3 },
   dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 },
 };
@@ -82,6 +84,21 @@ export function loadConfig(text: string | null): { config: Config; errors: strin
         if (value === "fail" || value === "close" || value === "allow") config.on_missing_spec = value;
         else errors.push("on_missing_spec must be fail, close or allow");
         break;
+      case "review": {
+        const d = value as Record<string, unknown> | null;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          for (const k of Object.keys(d)) if (!["threshold", "count_author"].includes(k)) errors.push(`unknown key: review.${k}`);
+          if (d.threshold !== undefined) {
+            if (typeof d.threshold === "number" && d.threshold >= 0) config.review.threshold = d.threshold;
+            else errors.push("review.threshold must be a number, 0 or more");
+          }
+          if (d.count_author !== undefined) {
+            if (typeof d.count_author === "boolean") config.review.count_author = d.count_author;
+            else errors.push("review.count_author must be true or false");
+          }
+        } else errors.push("review must be a mapping");
+        break;
+      }
       case "demand": {
         const d = value as Record<string, unknown> | null;
         if (d && typeof d === "object" && !Array.isArray(d)) {

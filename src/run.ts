@@ -12,6 +12,8 @@ export const CONFIG_FILE = ".spectree.yml";
 const MARKER = "<!-- spectree -->";
 const RECORD = /<!-- spectree-record: (.*?) -->/s;
 const SEEN = /<!-- spectree-seen: (.*?) -->/s;
+/** In the ledger of first sightings, a head commit is kept under this prefix; the other keys are spec digests. */
+const HEAD = "head:";
 const CONTEXTS = { spec: "spectree/spec", phase: "spectree/phase", scope: "spectree/scope" } as const;
 const SKIP = new Set([".git", "node_modules"]);
 
@@ -130,6 +132,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
       const specUnchangedSince: Record<string, boolean> = {};
       const specContents: Record<string, string> = {};
       const weights: Record<string, number> = {};
+      const onHead: Record<string, boolean> = {};
       let implementsRecord: ApprovalRecord | null = null;
       // Comments that are commands, the workflow's own left out.
       const commands: CommandComment[] = comments
@@ -145,6 +148,10 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
         const digest = specDigest(files.filter((f: { path: string }) => f.path.startsWith(cfg.root + "/")));
         seen = sawDigest(seen, digest, o.now);
         for (const c of commands) if ((specUnchangedSince[commandRef(c.id)] = countsNow(c, seen, digest))) counted.add(c.id);
+        // The same for the head commit, which is what a code review is given on. Only the current head is kept.
+        const headKey = HEAD + head;
+        if (!seen[headKey]) seen = { ...Object.fromEntries(Object.entries(seen).filter(([k]) => !k.startsWith(HEAD))), [headKey]: o.now };
+        for (const c of commands) if ((onHead[commandRef(c.id)] = countsNow(c, seen, headKey))) counted.add(c.id);
         reviews = (await o.gh.reviews(n))
           .filter((r: any) => r.user?.login && r.submitted_at)
           .map((r: any) => ({ user: r.user.login as string, state: r.state as string, commit: r.commit_id as string, at: r.submitted_at as string }));
@@ -165,7 +172,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
       const result = evaluatePr(
         {
           number: n, author, headSha: head, body: pull.body ?? "", labels: (pull.labels ?? []).map((l: any) => l.name), files, reviews,
-          specUnchangedSince, weights, authorCanWrite: await writer(author), specContents, baseSpecs: main.specs, baseFiles,
+          specUnchangedSince, onHead, weights, authorCanWrite: await writer(author), specContents, baseSpecs: main.specs, baseFiles,
           record: own?.record ?? null, implementsRecord, now: o.now,
         },
         cfg,

@@ -75,6 +75,9 @@ ratings: {}                       # vote weight per user, e.g. {alex: 5}
 exempt_paths: ["**/*.md", ".github/**"]             # changes here need no spec
 exempt_authors: ["dependabot[bot]", "renovate[bot]"]
 on_missing_spec: fail             # fail, close the pull request as well, or allow code without a spec
+review:
+  threshold: 1                    # weighted approvals the code needs, on its latest commit; 0 turns the code review off
+  count_author: true              # the author of the code counts as one approval, at their own weight
 dashboard:
   enabled: true
   path: ""                        # publish the page under this path
@@ -100,6 +103,19 @@ The settings are read from the default branch. A pull request cannot change them
 | A trusted contributor's vote counts | `ratings: {their-login: 1}` |
 | Only maintainers write code; outsiders write specs | `implementation: maintainers` |
 
+### Who approves the code
+
+The spec vote decides whether the project wants a change. The code then needs its own approval, counted on the latest commit of the pull request.
+
+| You want | Set |
+|---|---|
+| One maintainer: your own code passes, outside code needs your approval | Nothing |
+| Nobody merges their own code unread | `review.count_author: false` |
+| Two maintainers read every change | `review.threshold: 2` |
+| No code review by spectree | `review.threshold: 0` |
+
+A pull request that needs no spec (the `no-spec` label, `exempt_authors`, only exempt files) gets no code review from spectree.
+
 ## 4. Make the checks binding (optional)
 
 Until you do this, the checks report and do not block a merge.
@@ -110,7 +126,7 @@ In the repository settings, open **Branches** (or **Rules**), protect the defaul
 - `spectree/phase`
 - `spectree/scope`
 
-Leave "Dismiss stale pull request approvals when new commits are pushed" off, or accept that GitHub's own review list will show the votes as dismissed during the code phase. The spec approval is not affected: it was recorded when the vote passed.
+You do not need GitHub's own "Require approvals" rule: `spectree/phase` waits for the code review, and it can count a sole maintainer's own code, which GitHub's rule cannot. If you turn on "Dismiss stale pull request approvals when new commits are pushed", GitHub's review list shows the votes as dismissed during the code phase. The spec approval is not affected: it was recorded when the vote passed.
 
 ## 5. Add your first spec
 
@@ -156,6 +172,8 @@ Voting with a comment (`/spectree for`) needs the signal workflow to run on comm
   issue_comment:
     types: [created, edited]
 ```
+
+The code review arrived in November 2026 and is on by default. Maintainers' own pull requests pass as before; an outside contributor's code now waits for a maintainer's approval on its latest commit. `review.threshold: 0` brings the earlier behaviour back.
 
 The workflow file points at the `v1` tag. The tag moves by itself to every commit on spectree's main branch that passes its tests, so a change to the checks or to the roadmap page reaches your repository with its next run. Nothing to do.
 

@@ -9296,8 +9296,8 @@ var HELP = [
   "",
   "| Comment | Effect |",
   "|---|---|",
-  "| `/spectree for` | a vote for, the same as an approving review |",
-  '| `/spectree against <reason>` | a vote against, the same as "Request changes" |',
+  "| `/spectree for` | a vote for, the same as an approving review. Once the spec is approved, it approves the code |",
+  '| `/spectree against <reason>` | a vote against, the same as "Request changes". Once the spec is approved, it is about the code |',
   "| `/spectree withdraw` | takes your vote back |",
   "| `/spectree take` | says you will write the code of an approved spec |",
   "| `/spectree status` | asks for the tally and what the pull request waits for |"
@@ -9316,6 +9316,7 @@ var DEFAULTS = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
+  review: { threshold: 1, count_author: true },
   demand: { enabled: true, top: 3 },
   dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 }
 };
@@ -9370,6 +9371,21 @@ function loadConfig(text) {
         if (value === "fail" || value === "close" || value === "allow") config.on_missing_spec = value;
         else errors.push("on_missing_spec must be fail, close or allow");
         break;
+      case "review": {
+        const d = value;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          for (const k of Object.keys(d)) if (!["threshold", "count_author"].includes(k)) errors.push(`unknown key: review.${k}`);
+          if (d.threshold !== void 0) {
+            if (typeof d.threshold === "number" && d.threshold >= 0) config.review.threshold = d.threshold;
+            else errors.push("review.threshold must be a number, 0 or more");
+          }
+          if (d.count_author !== void 0) {
+            if (typeof d.count_author === "boolean") config.review.count_author = d.count_author;
+            else errors.push("review.count_author must be true or false");
+          }
+        } else errors.push("review must be a mapping");
+        break;
+      }
       case "demand": {
         const d = value;
         if (d && typeof d === "object" && !Array.isArray(d)) {
@@ -9734,7 +9750,7 @@ function summaryOf(body, max = 360) {
 function nextOf(r) {
   if (r.errors.length) return "fix";
   if (r.phase === "spec") return "votes";
-  if (r.phase === "code") return "review";
+  if (r.phase === "code") return r.review?.passed && r.statuses.phase.state === "success" && r.statuses.scope.state === "success" ? "merge" : "review";
   return r.statuses.phase.state === "pending" ? "code" : "merge";
 }
 var statusOf = (phase) => phase === "code" ? "in_progress" : phase === "approved" ? "approved" : "proposed";
@@ -9836,7 +9852,8 @@ function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
       againstPeople: r.tally?.againstPeople ?? 0,
       next,
       votes: (r.tally?.votes ?? []).map(({ user, vote, weight }) => ({ user, vote, weight })),
-      nodes: r.nodes.map((n) => n.id)
+      nodes: r.nodes.map((n) => n.id),
+      review: r.review ? { for: r.review.for, against: r.review.against, needed: cfg.review.threshold, passed: r.review.passed } : null
     });
     for (const n of r.nodes) {
       const own = n.planned !== null && r.phase !== "spec" ? "planned" : status;
@@ -10029,18 +10046,19 @@ function renderNode(n, c) {
 }
 function renderVotes(p, threshold) {
   const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc2(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
-  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return "<div>Approved</div>";
-  const lines = [`<div>${p.for} of ${threshold} for, ${p.against} against</div>`];
+  const code = p.review ? `<div>Code: ${p.review.for} of ${p.review.needed} for, ${p.review.against} against</div>` : "";
+  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return `<div>${code ? "Spec approved" : "Approved"}</div>${code}`;
+  const lines = [`<div>${code ? "Spec: " : ""}${p.for} of ${threshold} for, ${p.against} against</div>`];
   if (who("for")) lines.push(`<div class="muted">For: ${who("for")}</div>`);
   if (who("against")) lines.push(`<div class="muted">Against: ${who("against")}</div>`);
-  return lines.join("");
+  return lines.join("") + code;
 }
 function renderNext(p) {
   const hint = {
     fix: "The spec has problems. The vote starts when it is valid.",
     votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
     code: "The spec is approved and frozen. The code goes in this pull request, or in another with <code>Implements: #" + p.number + "</code>.",
-    review: "The code is in. It is reviewed like any other code.",
+    review: p.review ? `<a href="${p.url}/files">Review the code</a>: Approve on the latest commit, or comment <code>/spectree for</code>.` : "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge."
   };
   return `<div class="next">${NEXT[p.next]}</div><div class="muted">${hint[p.next]}</div>`;
@@ -10256,6 +10274,7 @@ function evaluatePr(input, cfg) {
     statuses: { spec: na, phase: na, scope: na },
     record: null,
     tally: null,
+    review: null,
     digest: null,
     nodes: [],
     errors: [],
@@ -10345,12 +10364,20 @@ function evaluatePr(input, cfg) {
   const toBuild = leaves.filter((n) => n.change !== "removed" && n.planned === null);
   const needCode = toBuild.filter((n) => !built(n.id));
   const phase = approved ? hasCode ? "code" : "approved" : "spec";
+  const review = phase === "code" && cfg.review.threshold > 0 ? tally(input.reviews, {
+    author: input.author,
+    weight: (u) => input.weights[u.toLowerCase()] ?? 0,
+    specUnchangedSince: (c) => c === input.headSha || input.onHead?.[c] === true,
+    cfg: { ...cfg, threshold: cfg.review.threshold, max_against: 0, count_author: cfg.review.count_author }
+  }) : null;
   const spec = errors.length ? fail(`The spec is not valid: ${errors[0]}${errors.length > 1 ? ` (and ${errors.length - 1} more)` : ""}`) : approved ? ok(`Vote passed: ${shown.for} for, ${shown.against} against${record.pr !== input.number ? ` (in #${record.pr})` : ""}`) : wait(`Vote open: ${tallyLine(live, cfg)}`);
   let phaseStatus;
   if (!approved && hasCode) phaseStatus = fail(`Code before approval: remove ${plural2(codeFiles.length, "file")} until the vote passes`);
   else if (!approved) phaseStatus = ok("Spec phase: waiting for the vote");
   else if (hasCode && cfg.implementation === "maintainers" && !input.authorCanWrite)
     phaseStatus = fail("In this project only maintainers write the code for an approved spec");
+  else if (review && !review.passed) phaseStatus = wait(`Code review open: ${review.for} of ${cfg.review.threshold} needed for, ${review.against} against`);
+  else if (review) phaseStatus = ok(`Code phase: spec approved, code reviewed (${review.for} for, ${review.against} against)`);
   else if (hasCode) phaseStatus = ok("Code phase: the spec is approved and frozen");
   else if (needCode.length) phaseStatus = wait("Spec approved. Add the code to this pull request");
   else if (toBuild.length) phaseStatus = ok("Spec approved. Its tests are already in the default branch, so it describes existing code");
@@ -10377,8 +10404,22 @@ function evaluatePr(input, cfg) {
     else if (missingTests.length) scope = fail(`${plural2(missingTests.length, "test")} named by the spec ${missingTests.length === 1 ? "does" : "do"} not exist: ${list2(missingTests, 2)}`);
     else scope = ok(`${plural2(codeFiles.length, "file")} inside the spec's paths, every criterion names an existing test`);
   }
-  const next = errors.length ? "Fix the spec. The vote starts when it is valid." : phase === "spec" ? hasCode ? "Remove the code from this pull request until the vote passes." : 'Vote with a review: "Approve" is for, "Request changes" is against.' : phase === "approved" ? needCode.length ? "The spec is frozen. Add the code to this pull request." : "This pull request can merge." : "The spec is frozen. The code goes through normal review.";
-  const votes = shown.votes.length ? shown.votes.map((v) => `- ${v.vote === "for" ? "For" : "Against"}: @${v.user}, weight ${v.weight}${v.author ? " (author)" : ""}`) : ["- No votes yet"];
+  const next = errors.length ? "Fix the spec. The vote starts when it is valid." : phase === "spec" ? hasCode ? "Remove the code from this pull request until the vote passes." : 'Vote with a review: "Approve" is for, "Request changes" is against.' : phase === "approved" ? needCode.length ? "The spec is frozen. Add the code to this pull request." : "This pull request can merge." : !review ? "The spec is frozen. The code goes through normal review." : review.passed ? "This pull request can merge." : "The spec is frozen. The code needs an approving review of the latest commit from someone whose vote has weight.";
+  const voteLines = (t) => t.votes.length ? t.votes.map((v) => `- ${v.vote === "for" ? "For" : "Against"}: @${v.user}, weight ${v.weight}${v.author ? " (author)" : ""}`) : ["- No votes yet"];
+  const votes = voteLines(shown);
+  const reviewLines = review ? [
+    `**Code review: ${review.passed ? "passed" : "open"}**`,
+    "",
+    "| | Weighted | People |",
+    "|---|---|---|",
+    `| For | ${review.for} of ${cfg.review.threshold} needed | ${review.forPeople} |`,
+    `| Against | ${review.against} (at most 0) | ${review.againstPeople} |`,
+    "",
+    ...voteLines(review),
+    "",
+    `Counted on commit ${input.headSha.slice(0, 7)}. A new commit asks for the review again.`,
+    ""
+  ] : [];
   const comment = [
     `**Spec vote: ${errors.length ? "not started" : approved ? "passed" : "open"}**`,
     "",
@@ -10392,6 +10433,7 @@ function evaluatePr(input, cfg) {
     ...errors.length ? ["**Problems in the spec:**", ...errors.map((e) => `- ${e}`), ""] : [],
     ...nodes.length ? ["**Specs in this pull request:**", ...nodes.map((n) => `- \`${n.id}\` (${n.planned !== null ? "planned " : ""}${n.kind}, ${n.change}): ${n.title}`), ""] : [],
     ...record ? [`Approved at commit ${record.commit.slice(0, 7)}${record.pr !== input.number ? ` in #${record.pr}` : ""}, spec digest \`${record.digest.slice(0, 19)}\`.`, ""] : [],
+    ...reviewLines,
     `**Next:** ${next}`
   ].join("\n");
   return {
@@ -10399,6 +10441,7 @@ function evaluatePr(input, cfg) {
     statuses: { spec, phase: phaseStatus, scope },
     record,
     tally: shown,
+    review,
     digest,
     nodes,
     errors,
@@ -10414,6 +10457,7 @@ var CONFIG_FILE = ".spectree.yml";
 var MARKER = "<!-- spectree -->";
 var RECORD = /<!-- spectree-record: (.*?) -->/s;
 var SEEN = /<!-- spectree-seen: (.*?) -->/s;
+var HEAD = "head:";
 var CONTEXTS = { spec: "spectree/spec", phase: "spectree/phase", scope: "spectree/scope" };
 var SKIP = /* @__PURE__ */ new Set([".git", "node_modules"]);
 function listFiles(dir, limit = 2e5) {
@@ -10511,6 +10555,7 @@ async function run(o) {
       const specUnchangedSince = {};
       const specContents = {};
       const weights = {};
+      const onHead = {};
       let implementsRecord = null;
       const commands = comments.filter((c) => c.user?.login && c.user.login !== o.bot && typeof c.body === "string" && parseCommand(c.body)).map((c) => ({
         id: c.id,
@@ -10525,6 +10570,9 @@ async function run(o) {
         const digest = specDigest(files.filter((f) => f.path.startsWith(cfg.root + "/")));
         seen = sawDigest(seen, digest, o.now);
         for (const c of commands) if (specUnchangedSince[commandRef(c.id)] = countsNow(c, seen, digest)) counted.add(c.id);
+        const headKey = HEAD + head;
+        if (!seen[headKey]) seen = { ...Object.fromEntries(Object.entries(seen).filter(([k]) => !k.startsWith(HEAD))), [headKey]: o.now };
+        for (const c of commands) if (onHead[commandRef(c.id)] = countsNow(c, seen, headKey)) counted.add(c.id);
         reviews = (await o.gh.reviews(n)).filter((r) => r.user?.login && r.submitted_at).map((r) => ({ user: r.user.login, state: r.state, commit: r.commit_id, at: r.submitted_at }));
         const headTree = await o.gh.dirTreeSha(head, cfg.root);
         for (const c of new Set(reviews.map((r) => r.commit)))
@@ -10549,6 +10597,7 @@ async function run(o) {
           files,
           reviews,
           specUnchangedSince,
+          onHead,
           weights,
           authorCanWrite: await writer(author),
           specContents,
