@@ -135,7 +135,10 @@ ${visible.toString()}
   }
   function jump() {
     var a = anchor(), n = a && document.getElementById("spec-" + a);
-    if (n) n.scrollIntoView();
+    if (!n) return;
+    var d = n.querySelector(":scope > details");
+    if (d) d.open = true;
+    n.scrollIntoView();
   }
   form.hidden = false;
   form.addEventListener("input", changed);
