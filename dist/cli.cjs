@@ -7380,8 +7380,18 @@ var DEFAULTS = {
   on_missing_spec: "fail",
   review: { threshold: 1, count_author: true },
   demand: { enabled: true, top: 3 },
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 }
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30, sign_in: "" }
 };
+function httpsUrl(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const u = new URL(value.trim());
+    if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) return null;
+    return (u.origin + u.pathname).replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
 function loadConfig(text) {
   const errors = [];
   const config = structuredClone(DEFAULTS);
@@ -7468,7 +7478,7 @@ function loadConfig(text) {
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days", "sign_in"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== void 0) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
@@ -7485,6 +7495,11 @@ function loadConfig(text) {
             if (typeof d.stale_days === "number" && Number.isInteger(d.stale_days) && d.stale_days >= 0) config.dashboard.stale_days = d.stale_days;
             else errors.push("dashboard.stale_days must be a whole number, 0 or more");
           }
+          if (d.sign_in !== void 0 && d.sign_in !== "") {
+            const url = httpsUrl(d.sign_in);
+            if (url) config.dashboard.sign_in = url;
+            else errors.push("dashboard.sign_in must be an https URL, the address of the sign-in service");
+          }
           if (d.project !== void 0) {
             if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;
             else errors.push("dashboard.project must be a Cloudflare Pages project name: lowercase letters, digits and dashes");
@@ -7498,6 +7513,196 @@ function loadConfig(text) {
     }
   }
   return { config, errors };
+}
+
+// src/dashboard.ts
+var import_node_crypto = require("node:crypto");
+
+// src/act.ts
+var apiOf = (serverUrl) => serverUrl === "https://github.com" ? "https://api.github.com" : `${serverUrl.replace(/\/+$/, "")}/api/v3`;
+function voteRequest(api, repository, pr, vote, reason) {
+  const why = reason.replace(/\s+/g, " ").trim();
+  if (vote !== "for" && vote !== "against") return null;
+  if (vote === "against" && !why) return null;
+  return { url: `${api}/repos/${repository}/issues/${Number(pr)}/comments`, method: "POST", body: { body: vote === "for" ? "/spectree for" : `/spectree against ${why}` } };
+}
+function wantRequest(api, repository, issue) {
+  return { url: `${api}/repos/${repository}/issues/${Number(issue)}/reactions`, method: "POST", body: { content: "+1" } };
+}
+function votedBy(login, forList, againstList) {
+  const me = login.toLowerCase();
+  const has = (list2) => list2.toLowerCase().split(",").includes(me);
+  return !me ? "" : has(forList) ? "for" : has(againstList) ? "against" : "";
+}
+function outcome(status, json, login) {
+  if (status >= 200 && status < 300) {
+    const url = json && typeof json.html_url === "string" && json.html_url.indexOf("https://") === 0 && json.body ? json.html_url : "";
+    return { ok: true, text: `Sent as @${login}`, url, note: "The page shows it after its next rebuild.", signOut: false };
+  }
+  const said = json && typeof json.message === "string" && json.message ? json.message : `GitHub answered ${status}`;
+  if (status === 401) return { ok: false, text: "Your sign-in has ended. Sign in again.", url: "", note: "", signOut: true };
+  return { ok: false, text: `GitHub refused: ${said}`, url: "", note: "", signOut: false };
+}
+function b64url(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function challengeOf(verifier, subtle) {
+  return b64url(new Uint8Array(await subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+}
+function returnAddress(href) {
+  const i = href.indexOf("#");
+  return i < 0 ? { address: href, hash: "" } : { address: href.slice(0, i), hash: href.slice(i) };
+}
+function startUrl(signIn, address, challenge) {
+  return `${signIn}/start?return=${encodeURIComponent(address)}&challenge=${challenge}`;
+}
+function ticketOf(hash) {
+  const key = "#spectree-ticket=";
+  return hash.indexOf(key) === 0 ? hash.slice(key.length) : null;
+}
+function session(env) {
+  const TOKEN = "spectree-token";
+  const PENDING = "spectree-sign-in";
+  const read = (key) => {
+    try {
+      return JSON.parse(env.storage.getItem(key) ?? "null");
+    } catch {
+      return null;
+    }
+  };
+  const signOut = () => env.storage.removeItem(TOKEN);
+  const who = () => {
+    const t = read(TOKEN);
+    if (!t || typeof t.token !== "string" || typeof t.login !== "string") return null;
+    if (t.expires_at && t.expires_at <= env.now()) {
+      signOut();
+      return null;
+    }
+    return t;
+  };
+  const headers = (token) => ({ Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" });
+  async function begin(href) {
+    const verifier = b64url(env.random(32));
+    const at = returnAddress(href);
+    env.storage.setItem(PENDING, JSON.stringify({ verifier, hash: at.hash }));
+    return startUrl(env.signIn, at.address, await challengeOf(verifier, env.subtle));
+  }
+  async function finish(hash) {
+    const ticket = ticketOf(hash);
+    if (ticket === null) return null;
+    const pending = read(PENDING);
+    env.storage.removeItem(PENDING);
+    const back = pending && typeof pending.hash === "string" ? pending.hash : "";
+    if (!ticket) return { hash: back, error: "" };
+    if (!pending || typeof pending.verifier !== "string") return { hash: back, error: "This sign-in was not started in this tab. Sign in again." };
+    try {
+      const res = await env.fetch(`${env.signIn}/token`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticket, verifier: pending.verifier }) });
+      const got = await res.json().catch(() => null);
+      if (res.status !== 200 || !got || typeof got.token !== "string") return { hash: back, error: `Sign-in failed: ${got && got.error || `the service answered ${res.status}`}` };
+      const user = await env.fetch(`${env.api}/user`, { method: "GET", headers: headers(got.token) });
+      const me = await user.json().catch(() => null);
+      if (user.status !== 200 || !me || typeof me.login !== "string") return { hash: back, error: "Sign-in failed: GitHub did not say who you are." };
+      env.storage.setItem(TOKEN, JSON.stringify({ token: got.token, expires_at: Number(got.expires_at) || 0, login: me.login }));
+      return { hash: back, error: "" };
+    } catch {
+      return { hash: back, error: "Sign-in failed: the sign-in service could not be reached." };
+    }
+  }
+  async function send(write) {
+    const t = who();
+    if (!t) return null;
+    try {
+      const res = await env.fetch(write.url, { method: write.method, headers: headers(t.token), body: JSON.stringify(write.body) });
+      const r = outcome(res.status, await res.json().catch(() => null), t.login);
+      if (r.signOut) signOut();
+      return r;
+    } catch {
+      return { ok: false, text: "GitHub could not be reached. Try again.", url: "", note: "", signOut: false };
+    }
+  }
+  return { who, signOut, begin, finish, send };
+}
+function actScript(signIn, repository, api = "https://api.github.com") {
+  const json = JSON.stringify({ signIn, repository, api }).replace(/</g, "\\u003c");
+  const fns = [voteRequest, wantRequest, votedBy, outcome, b64url, challengeOf, returnAddress, startUrl, ticketOf, session];
+  return `${fns.map((f) => f.toString()).join("\n")}
+(function (session, voteRequest, wantRequest, votedBy) {
+  var me = document.getElementById("me");
+  if (!me || !window.crypto || !crypto.subtle) return;
+  var C = ${json};
+  var s = session({
+    signIn: C.signIn, api: C.api, storage: sessionStorage, subtle: crypto.subtle,
+    fetch: function (url, init) { return fetch(url, init); },
+    random: function (n) { return crypto.getRandomValues(new Uint8Array(n)); },
+    now: function () { return Date.now(); }
+  });
+  var problem = "";
+  function el(tag, text, attrs) {
+    var e = document.createElement(tag);
+    e.textContent = text;
+    for (var k in attrs || {}) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function paint() {
+    var t = s.who();
+    me.textContent = "";
+    if (t) me.append("@" + t.login + " \xB7 ", el("button", "Sign out", { type: "button", "data-act": "sign-out" }));
+    else me.append(el("button", "Sign in with GitHub", { type: "button", "data-act": "sign-in" }));
+    if (problem) me.append(" ", el("span", problem, { class: "muted", role: "alert" }));
+    me.hidden = false;
+    [].forEach.call(document.querySelectorAll(".acts"), function (box) {
+      box.hidden = false;
+      var mine = box.querySelector(".mine");
+      if (!mine) return;
+      var v = t ? votedBy(t.login, box.dataset.for || "", box.dataset.against || "") : "";
+      mine.textContent = v ? "You voted " + v : "";
+    });
+  }
+  function go() {
+    s.begin(location.href).then(function (url) { location.assign(url); });
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("button[data-act]") : null;
+    if (!b) return;
+    var act = b.dataset.act, box = b.closest(".acts");
+    if (act === "sign-out") { s.signOut(); problem = ""; return paint(); }
+    if (act === "sign-in" || !s.who()) return go();
+    var write;
+    if (act === "want") write = wantRequest(C.api, C.repository, box.dataset.issue);
+    else {
+      var reason = act === "against" ? prompt("Why are you against it? The reason is posted with your vote.") || "" : "";
+      write = voteRequest(C.api, C.repository, box.dataset.pr, act, reason);
+    }
+    if (!write) return;
+    var said = box.querySelector(".said");
+    var buttons = [].slice.call(box.querySelectorAll("button"));
+    buttons.forEach(function (x) { x.disabled = true; });
+    s.send(write).then(function (r) {
+      buttons.forEach(function (x) { x.disabled = false; });
+      if (!r) return go();
+      said.textContent = "";
+      if (!r.ok) {
+        said.textContent = r.text;
+        if (r.signOut) paint();
+        return;
+      }
+      buttons.forEach(function (x) { x.remove(); });
+      var mine = box.querySelector(".mine");
+      if (mine) mine.textContent = "";
+      said.append(r.url ? el("a", r.text, { href: r.url }) : r.text, " " + r.note);
+    });
+  });
+  s.finish(location.hash).then(function (r) {
+    if (r) {
+      problem = r.error;
+      history.replaceState(null, "", location.pathname + location.search + r.hash);
+      if (r.hash) window.dispatchEvent(new Event("hashchange"));
+    }
+    paint();
+  });
+})(${session.name}, ${voteRequest.name}, ${wantRequest.name}, ${votedBy.name});`;
 }
 
 // src/find.ts
@@ -8001,14 +8206,14 @@ function renderRecent(data, window) {
   return `<h2>Lately</h2>
 <ul class="recent">${data.recent.slice(0, RECENT_SHOWN).map(line).join("")}</ul><p class="muted">${more > 0 ? `And ${more} more in the last ${plural(window, "day")}. ` : ""}${pace}</p>`;
 }
-function renderQueue(data) {
+function renderQueue(data, act = false) {
   if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
   const row = (p) => {
     const age = p.opened ? ` \xB7 opened ${p.days ? days(p.days) + " ago" : "today"}${p.days_in_step !== p.days ? ` \xB7 ${p.days_in_step ? days(p.days_in_step) : "since today"} in this step` : ""}` : "";
     return `<tr><td><a href="${p.url}">#${p.number} ${esc2(p.title)}</a><div class="muted">by ${esc2(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}${p.taken_by && p.next === "code" ? `<div class="muted">Taken by @${esc2(p.taken_by)}</div>` : ""}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
       p,
       data.threshold
-    )}</td><td>${renderNext(p)}</td></tr>`;
+    )}</td><td>${renderNext(p, act)}</td></tr>`;
   };
   const groups = STEPS.map((step) => {
     const list2 = data.proposals.filter((p) => p.next === step).sort((a, b) => b.days_in_step - a.days_in_step || a.number - b.number);
@@ -8050,16 +8255,19 @@ function renderMore(n, c) {
         n.thread || `${c.repoUrl}/issues/new?title=${enc(n.id)}&labels=${THREAD_LABEL}&body=${enc(`The thread of the spec \`${n.id}\`: ${c.repoUrl}/blob/${c.branch}/${specPath}
 
 A \u{1F44D} on this post says you want it. Discussion goes below.`)}`,
-        n.thread ? "Discuss or \u{1F44D}" : "Start its thread",
+        n.thread ? c.act ? "Discuss" : "Discuss or \u{1F44D}" : "Start its thread",
         "A thumbs-up on the thread's first post says you want this spec"
       );
     link(newSpecUrl(c, n.id), "Add a spec below");
     if (n.kind === "leaf" && n.status === "planned") link(editUrl, "Build this", "Remove planned, add paths and criteria, and bring the code in the same pull request");
   } else {
     link(`${c.repoUrl}/pull/${adds.pr}/files`, "Edit", "The spec is in this pull request; changes go there");
-    link(`${c.repoUrl}/pull/${adds.pr}`, c.demand ? "Discuss or \u{1F44D}" : "Discuss", "A thumbs-up on the pull request's description says you want this spec");
+    link(`${c.repoUrl}/pull/${adds.pr}`, c.demand && !c.act ? "Discuss or \u{1F44D}" : "Discuss", "A thumbs-up on the pull request's description says you want this spec");
     if (n.kind === "leaf" && n.status === "approved") link(`${c.repoUrl}/pull/${adds.pr}`, "Take it", `Write the code in that pull request, or in your own whose description says Implements: #${adds.pr}`);
   }
+  const issue = adds ? adds.pr : Number(/\/issues\/(\d+)$/.exec(n.thread)?.[1] ?? 0);
+  if (c.act && c.demand && issue)
+    act.push(`<span class="acts" data-issue="${issue}" hidden><button type="button" data-act="want">\u{1F44D} Want this</button> <span class="muted said" role="status"></span></span>`);
   return `${whole}<p class="muted stands">${stands.join(" \xB7 ")}</p><p class="actions">${act.join(" ")}</p>`;
 }
 function renderDetail(n, c) {
@@ -8107,7 +8315,7 @@ function renderVotes(p, threshold) {
   if (who("against")) lines.push(`<div class="muted">Against: ${who("against")}</div>`);
   return lines.join("") + code;
 }
-function renderNext(p) {
+function renderNext(p, act = false) {
   const hint = {
     fix: "The spec has problems. The vote starts when it is valid.",
     votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
@@ -8115,7 +8323,9 @@ function renderNext(p) {
     review: p.review ? `<a href="${p.url}/files">Review the code</a>: Approve on the latest commit, or comment <code>/spectree for</code>.` : "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge."
   };
-  return `<div class="next">${NEXT[p.next]}</div><div class="muted">${hint[p.next]}</div>`;
+  const names = (v) => esc2(p.votes.filter((x) => x.vote === v).map((x) => x.user).join(","));
+  const buttons = act && p.next === "votes" ? `<div class="acts" data-pr="${p.number}" data-for="${names("for")}" data-against="${names("against")}" hidden><button type="button" data-act="for">For</button> <button type="button" data-act="against">Against</button> <span class="muted mine"></span> <span class="muted said" role="status"></span></div>` : "";
+  return `<div class="next">${NEXT[p.next]}</div><div class="muted">${hint[p.next]}</div>${buttons}`;
 }
 function renderHtml(data, cfg, serverUrl = "https://github.com") {
   const repoUrl = `${serverUrl}/${data.repository}`;
@@ -8131,11 +8341,13 @@ function renderHtml(data, cfg, serverUrl = "https://github.com") {
     branch: data.branch,
     demand: cfg.demand.enabled,
     threshold: data.threshold,
+    act: cfg.dashboard.sign_in !== "",
     prs: new Map(data.proposals.map((p) => [p.number, p]))
   };
   const wanted = data.wanted.length ? `<h2>Most wanted</h2>
 <ol class="wanted">${data.wanted.map((w) => `<li><a href="#spec-${esc2(w.id)}">${esc2(w.title)}</a> <span class="want">\u{1F44D} ${w.up}</span></li>`).join("")}</ol>` : "";
-  const proposals = renderQueue(data);
+  const signIn = cfg.dashboard.sign_in;
+  const proposals = renderQueue(data, ctx.act);
   const fresh = !data.tree.length && !data.proposals.length;
   const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, ctx)).join("")}</ul>` : `<div class="empty"><p><strong>No specs yet.</strong> A spec is a file, <code>${esc2(cfg.root)}/&lt;name&gt;/spec.md</code>, that says what one part of the project does and names the tests that prove it. Add the first one in a pull request.</p><p>To check the tree on your machine:</p><pre>npx github:beamreach-ai/spectree validate
 npx github:beamreach-ai/spectree tree</pre></div>`;
@@ -8154,11 +8366,20 @@ npx github:beamreach-ai/spectree tree</pre></div>`;
     how.addEventListener("toggle", function () { localStorage.setItem("spectree-how", how.open ? "open" : "closed"); });
   } catch (e) {}
 })();`;
+  const api = apiOf(serverUrl);
+  const scripts = [...data.tree.length ? [findScript(known), howScript] : [], ...signIn ? [actScript(signIn, data.repository, api)] : []];
+  const script = scripts.length ? `
+${scripts.join("\n")}
+` : "";
+  const csp = signIn ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${(0, import_node_crypto.createHash)("sha256").update(script).digest("base64")}'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src ${new URL(api).origin} ${new URL(signIn).origin}; form-action 'none'; base-uri 'none'">
+` : "";
+  const actCss = signIn ? `.me{float:right;font-size:14px;color:var(--muted)}.me button,.acts button{font:inherit;font-size:14px;font-weight:600;color:var(--link);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer}.me button:hover,.acts button:hover{border-color:var(--link)}.acts button:disabled{opacity:.5;cursor:default}.acts{margin-top:6px}.actions .acts{margin:0}.acts[hidden],.me[hidden]{display:none}
+` : "";
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+${csp}<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc2(name)} roadmap</title>
 <meta name="description" content="The roadmap of ${esc2(data.repository)}: every spec, its status, and the open proposals with their votes.">
 <style>
@@ -8237,13 +8458,13 @@ details[open]>summary.row::before{transform:rotate(90deg)}
 .detail p{margin:6px 0}
 .criteria{margin:6px 0;padding-left:20px}.criteria li{margin:4px 0}.criteria .muted{display:block;font-size:13px}
 footer{margin-top:40px}
-@media (max-width:640px){table:not(.overview),table:not(.overview) tbody,table:not(.overview) tr,table:not(.overview) td{display:block}table:not(.overview) thead{display:none}table:not(.overview){min-width:0}
+${actCss}@media (max-width:640px){table:not(.overview),table:not(.overview) tbody,table:not(.overview) tr,table:not(.overview) td{display:block}table:not(.overview) thead{display:none}table:not(.overview){min-width:0}
 table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) tr{padding:10px 0;border-bottom:1px solid var(--line)}table:not(.overview) tr:last-child{border-bottom:0}}
 </style>
 </head>
 <body>
 <main>
-<h1>${esc2(name)} roadmap</h1>
+${signIn ? '<div class="me" id="me" hidden></div>\n' : ""}<h1>${esc2(name)} roadmap</h1>
 <div class="muted"><a href="${repoUrl}">${esc2(data.repository)}</a></div>
 <p><a class="button" href="${esc2(newSpecUrl(ctx, ""))}">Propose a spec</a></p>
 ${intro}
@@ -8257,10 +8478,7 @@ ${renderFind(data)}
 <div class="box">${tree}</div>
 <footer class="muted">Updated ${esc2(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
-${data.tree.length ? `<script>
-${findScript(known)}
-${howScript}
-</script>` : ""}
+${script ? `<script>${script}</script>` : ""}
 </body>
 </html>
 `;

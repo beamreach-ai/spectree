@@ -1,0 +1,19 @@
+# The sign-in service of a spectree roadmap page. See README.md in this directory.
+name = "roadmap-login"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+workers_dev = true
+
+# No storage binding: the service keeps nothing.
+[observability]
+enabled = false
+
+[vars]
+# The roadmap pages that may use this service, separated by spaces. Keep the slash at the end.
+ALLOWED_PAGES = "https://OWNER.github.io/REPOSITORY/"
+# The GitHub App's client id. It is not a secret.
+GITHUB_CLIENT_ID = ""
+
+# Two secrets, set with `wrangler secret put`, never written here:
+#   GITHUB_CLIENT_SECRET   the GitHub App's client secret
+#   SIGNING_SECRET         openssl rand -base64 48

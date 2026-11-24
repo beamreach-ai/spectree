@@ -13,7 +13,7 @@ export interface Config {
   on_missing_spec: "fail" | "close" | "allow";
   review: { threshold: number; count_author: boolean };
   demand: { enabled: boolean; top: number };
-  dashboard: { enabled: boolean; path: string; host: "github-pages" | "cloudflare"; project: string; collapse_over: number; stale_days: number; recent_days: number };
+  dashboard: { enabled: boolean; path: string; host: "github-pages" | "cloudflare"; project: string; collapse_over: number; stale_days: number; recent_days: number; sign_in: string };
 }
 
 export const DEFAULTS: Config = {
@@ -29,8 +29,20 @@ export const DEFAULTS: Config = {
   on_missing_spec: "fail",
   review: { threshold: 1, count_author: true },
   demand: { enabled: true, top: 3 },
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 },
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30, sign_in: "" },
 };
+
+/** An https address without credentials, query or fragment, with no slash at the end; null for anything else. */
+function httpsUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const u = new URL(value.trim());
+    if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) return null;
+    return (u.origin + u.pathname).replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
 
 /** Reads `.spectree.yml` text. Unknown keys and wrong types are reported, never guessed. */
 export function loadConfig(text: string | null): { config: Config; errors: string[] } {
@@ -119,7 +131,7 @@ export function loadConfig(text: string | null): { config: Config; errors: strin
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days", "sign_in"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== undefined) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
@@ -135,6 +147,11 @@ export function loadConfig(text: string | null): { config: Config; errors: strin
           if (d.stale_days !== undefined) {
             if (typeof d.stale_days === "number" && Number.isInteger(d.stale_days) && d.stale_days >= 0) config.dashboard.stale_days = d.stale_days;
             else errors.push("dashboard.stale_days must be a whole number, 0 or more");
+          }
+          if (d.sign_in !== undefined && d.sign_in !== "") {
+            const url = httpsUrl(d.sign_in);
+            if (url) config.dashboard.sign_in = url;
+            else errors.push("dashboard.sign_in must be an https URL, the address of the sign-in service");
           }
           if (d.project !== undefined) {
             if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;

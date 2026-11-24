@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { actScript, apiOf } from "./act.ts";
 import type { Config } from "./config.ts";
 import type { NodeChange, Phase, PrResult } from "./evaluate.ts";
 import { findScript, writeView } from "./find.ts";
@@ -403,7 +405,7 @@ function renderRecent(data: DashData, window: number): string {
   }${pace}</p>`;
 }
 
-function renderQueue(data: DashData): string {
+function renderQueue(data: DashData, act = false): string {
   if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
   const row = (p: DashPr) => {
     const age = p.opened
@@ -414,7 +416,7 @@ function renderQueue(data: DashData): string {
     }</div>${renderSpecs(p.nodes)}${p.taken_by && p.next === "code" ? `<div class="muted">Taken by @${esc(p.taken_by)}</div>` : ""}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
       p,
       data.threshold,
-    )}</td><td>${renderNext(p)}</td></tr>`;
+    )}</td><td>${renderNext(p, act)}</td></tr>`;
   };
   const groups = STEPS.map((step) => {
     // The one that has waited longest in its step comes first.
@@ -441,6 +443,8 @@ interface Ctx {
   demand: boolean;
   prs: Map<number, DashPr>;
   threshold: number;
+  /** Whether the page has buttons: `dashboard.sign_in` is set. */
+  act: boolean;
 }
 const enc = encodeURIComponent;
 const newSpecUrl = (c: Pick<Ctx, "repoUrl" | "branch" | "root">, under: string) =>
@@ -473,16 +477,20 @@ function renderMore(n: DashNode, c: Ctx): string {
       link(
         n.thread ||
           `${c.repoUrl}/issues/new?title=${enc(n.id)}&labels=${THREAD_LABEL}&body=${enc(`The thread of the spec \`${n.id}\`: ${c.repoUrl}/blob/${c.branch}/${specPath}\n\nA 👍 on this post says you want it. Discussion goes below.`)}`,
-        n.thread ? "Discuss or 👍" : "Start its thread",
+        n.thread ? (c.act ? "Discuss" : "Discuss or 👍") : "Start its thread",
         "A thumbs-up on the thread's first post says you want this spec",
       );
     link(newSpecUrl(c, n.id), "Add a spec below");
     if (n.kind === "leaf" && n.status === "planned") link(editUrl, "Build this", "Remove planned, add paths and criteria, and bring the code in the same pull request");
   } else {
     link(`${c.repoUrl}/pull/${adds.pr}/files`, "Edit", "The spec is in this pull request; changes go there");
-    link(`${c.repoUrl}/pull/${adds.pr}`, c.demand ? "Discuss or 👍" : "Discuss", "A thumbs-up on the pull request's description says you want this spec");
+    link(`${c.repoUrl}/pull/${adds.pr}`, c.demand && !c.act ? "Discuss or 👍" : "Discuss", "A thumbs-up on the pull request's description says you want this spec");
     if (n.kind === "leaf" && n.status === "approved") link(`${c.repoUrl}/pull/${adds.pr}`, "Take it", `Write the code in that pull request, or in your own whose description says Implements: #${adds.pr}`);
   }
+  // The thumbs-up goes to the thread, or to the pull request of a spec that is only proposed.
+  const issue = adds ? adds.pr : Number(/\/issues\/(\d+)$/.exec(n.thread)?.[1] ?? 0);
+  if (c.act && c.demand && issue)
+    act.push(`<span class="acts" data-issue="${issue}" hidden><button type="button" data-act="want">👍 Want this</button> <span class="muted said" role="status"></span></span>`);
   return `${whole}<p class="muted stands">${stands.join(" · ")}</p><p class="actions">${act.join(" ")}</p>`;
 }
 
@@ -558,7 +566,7 @@ function renderVotes(p: DashPr, threshold: number): string {
   return lines.join("") + code;
 }
 
-function renderNext(p: DashPr): string {
+function renderNext(p: DashPr, act = false): string {
   const hint: Record<NextStep, string> = {
     fix: "The spec has problems. The vote starts when it is valid.",
     votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
@@ -568,7 +576,13 @@ function renderNext(p: DashPr): string {
       : "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge.",
   };
-  return `<div class="next">${NEXT[p.next]}</div><div class="muted">${hint[p.next]}</div>`;
+  // Only the vote has buttons. An approval of code comes from someone looking at the code.
+  const names = (v: "for" | "against") => esc(p.votes.filter((x) => x.vote === v).map((x) => x.user).join(","));
+  const buttons =
+    act && p.next === "votes"
+      ? `<div class="acts" data-pr="${p.number}" data-for="${names("for")}" data-against="${names("against")}" hidden><button type="button" data-act="for">For</button> <button type="button" data-act="against">Against</button> <span class="muted mine"></span> <span class="muted said" role="status"></span></div>`
+      : "";
+  return `<div class="next">${NEXT[p.next]}</div><div class="muted">${hint[p.next]}</div>${buttons}`;
 }
 
 export function renderHtml(data: DashData, cfg: Config, serverUrl = "https://github.com"): string {
@@ -580,7 +594,7 @@ export function renderHtml(data: DashData, cfg: Config, serverUrl = "https://git
   const closed = over > 0 && data.overview.all.total > over;
   const known = { statuses: ORDER as string[], horizons: data.overview.horizons, tops: data.overview.rows.map((r) => r.id) };
   const ctx: Ctx = {
-    repoUrl, root: cfg.root, closed, branch: data.branch, demand: cfg.demand.enabled, threshold: data.threshold,
+    repoUrl, root: cfg.root, closed, branch: data.branch, demand: cfg.demand.enabled, threshold: data.threshold, act: cfg.dashboard.sign_in !== "",
     prs: new Map(data.proposals.map((p) => [p.number, p])),
   };
   const wanted = data.wanted.length
@@ -588,7 +602,8 @@ export function renderHtml(data: DashData, cfg: Config, serverUrl = "https://git
         .map((w) => `<li><a href="#spec-${esc(w.id)}">${esc(w.title)}</a> <span class="want">👍 ${w.up}</span></li>`)
         .join("")}</ol>`
     : "";
-  const proposals = renderQueue(data);
+  const signIn = cfg.dashboard.sign_in;
+  const proposals = renderQueue(data, ctx.act);
   const fresh = !data.tree.length && !data.proposals.length;
   const tree = data.tree.length
     ? `<ul class="tree">${data.tree.map((n) => renderNode(n, ctx)).join("")}</ul>`
@@ -610,11 +625,21 @@ npx github:beamreach-ai/spectree tree</pre></div>`;
     how.addEventListener("toggle", function () { localStorage.setItem("spectree-how", how.open ? "open" : "closed"); });
   } catch (e) {}
 })();`;
+  const api = apiOf(serverUrl);
+  const scripts = [...(data.tree.length ? [findScript(known), howScript] : []), ...(signIn ? [actScript(signIn, data.repository, api)] : [])];
+  const script = scripts.length ? `\n${scripts.join("\n")}\n` : "";
+  // With buttons, a token is in the page: only this script runs, and it reaches only GitHub's API and the sign-in service.
+  const csp = signIn
+    ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${createHash("sha256").update(script).digest("base64")}'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src ${new URL(api).origin} ${new URL(signIn).origin}; form-action 'none'; base-uri 'none'">\n`
+    : "";
+  const actCss = signIn
+    ? `.me{float:right;font-size:14px;color:var(--muted)}.me button,.acts button{font:inherit;font-size:14px;font-weight:600;color:var(--link);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer}.me button:hover,.acts button:hover{border-color:var(--link)}.acts button:disabled{opacity:.5;cursor:default}.acts{margin-top:6px}.actions .acts{margin:0}.acts[hidden],.me[hidden]{display:none}\n`
+    : "";
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+${csp}<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(name)} roadmap</title>
 <meta name="description" content="The roadmap of ${esc(data.repository)}: every spec, its status, and the open proposals with their votes.">
 <style>
@@ -693,13 +718,13 @@ details[open]>summary.row::before{transform:rotate(90deg)}
 .detail p{margin:6px 0}
 .criteria{margin:6px 0;padding-left:20px}.criteria li{margin:4px 0}.criteria .muted{display:block;font-size:13px}
 footer{margin-top:40px}
-@media (max-width:640px){table:not(.overview),table:not(.overview) tbody,table:not(.overview) tr,table:not(.overview) td{display:block}table:not(.overview) thead{display:none}table:not(.overview){min-width:0}
+${actCss}@media (max-width:640px){table:not(.overview),table:not(.overview) tbody,table:not(.overview) tr,table:not(.overview) td{display:block}table:not(.overview) thead{display:none}table:not(.overview){min-width:0}
 table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) tr{padding:10px 0;border-bottom:1px solid var(--line)}table:not(.overview) tr:last-child{border-bottom:0}}
 </style>
 </head>
 <body>
 <main>
-<h1>${esc(name)} roadmap</h1>
+${signIn ? '<div class="me" id="me" hidden></div>\n' : ""}<h1>${esc(name)} roadmap</h1>
 <div class="muted"><a href="${repoUrl}">${esc(data.repository)}</a></div>
 <p><a class="button" href="${esc(newSpecUrl(ctx, ""))}">Propose a spec</a></p>
 ${intro}
@@ -712,7 +737,7 @@ ${renderFind(data)}
 <div class="box">${tree}</div>
 <footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
-${data.tree.length ? `<script>\n${findScript(known)}\n${howScript}\n</script>` : ""}
+${script ? `<script>${script}</script>` : ""}
 </body>
 </html>
 `;
