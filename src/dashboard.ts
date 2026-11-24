@@ -538,7 +538,9 @@ function renderNode(n: DashNode, c: Ctx): string {
   const kids = n.children.length ? `<ul>${n.children.map((k) => renderNode(k, c)).join("")}</ul>` : "";
   const text = `${n.title} ${n.id} ${n.summary}`.toLowerCase();
   const li = `<li class="node" id="spec-${esc(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc(n.horizon)}" data-text="${esc(text)}">`;
-  return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
+  // A leaf with specs below it opens to those specs; its own text waits behind one closed line.
+  const about = n.kind === "leaf" && kids && detail ? `<details class="about"><summary>About this spec</summary>${detail}</details>` : detail;
+  return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${about}${kids}</details></li>`;
 }
 
 function renderVotes(p: DashPr, threshold: number): string {
@@ -686,6 +688,7 @@ details[open]>summary.row::before{transform:rotate(90deg)}
 .level{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);min-width:56px}
 .title{font-weight:600;color:var(--fg)}
 .pr{font-size:13px}
+.about>summary{margin:2px 0 4px 29px;font-size:13px;color:var(--muted)}.about>summary:hover{color:var(--fg)}.about[open]>summary{margin-bottom:6px}
 .detail{margin:0 0 10px 15px;padding:2px 0 4px 14px;border-left:2px solid var(--line);font-size:15px;max-width:760px}
 .detail p{margin:6px 0}
 .criteria{margin:6px 0;padding-left:20px}.criteria li{margin:4px 0}.criteria .muted{display:block;font-size:13px}

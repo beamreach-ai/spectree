@@ -138,6 +138,8 @@ ${visible.toString()}
     if (!n) return;
     var d = n.querySelector(":scope > details");
     if (d) d.open = true;
+    var about = n.querySelector(":scope > details > details.about");
+    if (about) about.open = true;
     n.scrollIntoView();
   }
   form.hidden = false;

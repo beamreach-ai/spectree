@@ -22,6 +22,9 @@ criteria:
   - id: short
     text: "A spec whose body is its first paragraph and nothing more has no separate whole view."
     tests: [test/act.test.ts]
+  - id: with-children
+    text: "A spec that has specs below it opens to those specs. Its own text is behind one closed line, `About this spec`, and a link to the spec opens that line too."
+    tests: [test/act.test.ts]
   - id: json
     text: "roadmap.json carries each spec's body as Markdown."
     tests: [test/act.test.ts]
@@ -65,3 +68,8 @@ A link's address is kept when it starts with `http://`, `https://` or `mailto:`.
 - Images, footnotes, task lists and HTML in specs.
 - A spec's history: when it was proposed, approved and merged. `dashboard/recent` has the dates the page can know.
 - A diff of a proposed change, and comments shown inside the page.
+
+
+## A spec with specs below it
+
+A leaf can have leaves under it: `dashboard` describes the page and holds the specs of its parts. The tree opens such a node to show its children, and used to show the node's own detail above them as well, so two specs stood expanded on the first screen while every other row was one line. Now the node opens to its children, and its own detail is behind a closed line, `About this spec`. A link to the spec (`#spec-<id>`) opens the line. A group is unchanged: it has no detail of its own beyond its first paragraph.
