@@ -34,6 +34,7 @@ A spec is short. With spectree the maintainer first reads what a change is meant
   - `spectree/scope`: does the code stay inside the paths the spec named, and does every acceptance criterion name a test that exists?
 - **A roadmap page** on GitHub Pages shows every spec as done, in progress, approved, proposed or planned. It opens with an overview by area and horizon and what changed lately, lists open proposals by what they wait for, and can be searched and filtered. Each spec opens to its whole text and links to GitHub's forms to edit it, build it or propose one below it.
 - **Demand is separate from the vote.** Anyone can add a 👍 to a spec's thread; the page shows the count and the most wanted specs. It never changes a vote.
+- **Vote from the page, if you want.** With a small [sign-in service](login/README.md) that you run, the page has For, Against and 👍 buttons. They write to GitHub as the visitor; without the service the page links to GitHub instead.
 - **No status is stored in any file.** It is worked out from the default branch and the open pull requests, so it cannot go stale.
 
 ## Add it to your repository

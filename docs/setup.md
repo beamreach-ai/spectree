@@ -66,6 +66,24 @@ A GitHub Pages site from a private repository is public, unless the owner is on 
 
 The deploy runs in a job of its own, which receives the two Cloudflare secrets and nothing else. A failed deploy is reported in the run and does not fail the checks.
 
+### Vote buttons on the page
+
+By default the page links to GitHub for every action. It can carry buttons instead: **For** and **Against** on a proposal that waits for votes, and **👍 Want this** on a spec. A press writes the same comment or thumbs-up on GitHub that the visitor could write by hand, as the visitor. Votes stay on GitHub, and no button approves code.
+
+A static page cannot sign a visitor in to GitHub by itself, so this needs two things that you run:
+
+1. **A sign-in service**: one Cloudflare Worker file, [`login/worker.js`](../login/worker.js). It stores nothing.
+2. **A GitHub App** with read and write access to issues and pull requests, installed on the repository.
+
+[`login/README.md`](../login/README.md) has the steps, about ten minutes in all. Then set the service's address:
+
+```yaml
+dashboard:
+  sign_in: https://roadmap-login.acme.workers.dev
+```
+
+With the setting, the page carries a Content-Security-Policy: only its own script runs, and it reaches only GitHub's API and your service. The visitor's token stays in the browser tab, for at most eight hours. Read "Before you turn it on" in that README first if the repository's owner publishes other sites on the same `github.io` address.
+
 ## 3. Change the defaults (optional)
 
 Add `.spectree.yml` to the root of the repository. Every key is optional, and these are the defaults:
@@ -92,6 +110,7 @@ dashboard:
   collapse_over: 40               # with more specs than this, the page opens with its groups closed; 0 never closes them
   stale_days: 30                  # a proposal this long in one step is marked stale; 0 marks none
   recent_days: 30                 # the window of "Lately" on the page; 0 leaves it out
+  sign_in: ""                     # the address of your sign-in service: puts vote buttons on the page (see section 2)
 demand:
   enabled: true                   # count thumbs-up on a spec's thread as demand, and show it on the page
   top: 3                          # how many specs "Most wanted" lists; 0 hides it
