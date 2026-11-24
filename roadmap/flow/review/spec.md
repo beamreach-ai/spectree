@@ -28,6 +28,9 @@ criteria:
   - id: one-review
     text: "When spec and code arrive in the same commit, one approving review on that commit passes the spec vote and the code review together."
     tests: [test/review.test.ts]
+  - id: spec-change
+    text: "When the spec changes after approval in a pull request that holds code, the spec vote opens again, `spectree/phase` fails with `Code before approval`, and no code review is counted until the vote passes. An approving review of the new commit then passes the vote and the code review together; the code does not have to be removed and pushed again."
+    tests: [test/review.test.ts]
   - id: commands
     text: "`/spectree for` and `/spectree against` count for the code when they were written after the workflow first saw the head commit; `/spectree withdraw` takes the commenter's code vote back."
     tests: [test/review.test.ts]
@@ -74,6 +77,16 @@ It applies to a pull request that changes specs, whose spec vote has passed, and
 - **Passing.** Weighted approvals at or above `review.threshold`, and no vote against with a weight above zero.
 - **One review can do both.** When spec and code are pushed in one commit, `spectree/phase` fails with "Code before approval", as today. An approving review on that commit passes the spec vote; the same review is on the head commit, so the code review passes with it.
 - **Taking over.** A pull request with `Implements: #n` inherits the spec approval of #n and nothing else. Its code needs its own review.
+
+## When the spec changes after approval
+
+Nothing here is new except the last step; it is written out because the two approvals meet.
+
+1. The author edits a spec file in a pull request whose spec was approved. Any edit counts, a typo as well. The recorded approval no longer matches the spec's text, so the workflow drops it and removes the `spec-approved` label.
+2. `spectree/spec` is pending with `Vote open`. Votes given on the earlier text do not count.
+3. If the pull request holds code, `spectree/phase` fails with `Code before approval`. There is no code review while the vote is open: the workflow's comment has no `Code review` table, and an earlier code approval is gone with the commit it was given on.
+4. A reviewer approves the new commit. That review passes the spec vote, and because it is on the head commit it is the code approval too. The code stays in the pull request throughout.
+5. If the author puts the spec back exactly as it was approved, the votes given on that text count again and the vote passes without a new one. The code still needs an approval on the new head commit.
 
 ## Settings
 
