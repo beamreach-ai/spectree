@@ -1,6 +1,0 @@
-# spectree's own settings. Every key is optional; see docs/setup.md.
-
-# yura-works is a test account that plays the outside contributor. It has write access so that it can push
-# branches here, and weight 0 so that its votes are shown and do not decide.
-ratings:
-  yura-works: 0

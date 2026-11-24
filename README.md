@@ -1,6 +1,12 @@
 # spectree
 
+[![roadmap](https://img.shields.io/endpoint?url=https://beamreach-ai.github.io/spectree/badge.json)](https://beamreach-ai.github.io/spectree/)
+
 Specs as a tree in your repository. A contribution starts as a spec, people vote on it, and code is accepted only for a spec that passed the vote. Spec and code merge together, in one pull request.
+
+[![spectree's own roadmap page: an overview by area, with progress and what is planned](docs/roadmap.png)](https://beamreach-ai.github.io/spectree/)
+
+spectree is built with spectree. That is its own [roadmap page](https://beamreach-ai.github.io/spectree/), made by the workflow from this repository's `roadmap/` directory and its open pull requests.
 
 ## Why
 
