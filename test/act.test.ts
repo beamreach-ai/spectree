@@ -176,3 +176,16 @@ test("json: roadmap.json carries each spec's body as Markdown", () => {
   assert.equal(kids["search/new"].body, "Why New thing.");
   assert.equal(d.tree[0].body, "About Search.");
 });
+
+test("with-children: a spec with specs below it opens to them, and its own text is behind About this spec", () => {
+  const main = specs({ search: group("Search"), "search/full": leaf("Full index", BODY), "search/full/fast": leaf("Fast"), "search/short": leaf("Short") });
+  const html = renderHtml(buildData(main, [], DEFAULTS, "acme/engine", NOW, { branch: "trunk" }), DEFAULTS);
+  const node = (id: string) => new RegExp(`<li class="node" id="spec-${id}"[^>]*>(<details[^>]*>)<summary class="row">.*?</summary>(.{0,60})`, "s").exec(html)!;
+  assert.equal(node("search/full")[1], "<details open>");
+  assert.ok(node("search/full")[2].startsWith('<details class="about"><summary>About this spec</summary>'), "closed: no open attribute");
+  assert.match(html, /<details class="about"><summary>About this spec<\/summary><div class="detail">.*?<\/div><\/details><ul><li class="node" id="spec-search\/full\/fast"/s);
+  assert.ok(node("search/short")[2].startsWith('<div class="detail">'), "a leaf with nothing below it is as before");
+  assert.ok(node("search")[1] === "<details open>" && !node("search")[2].startsWith('<details class="about">'), "a group is as before");
+  assert.equal(html.match(/class="about"/g)!.length, 1);
+  assert.match(html, /querySelector\(":scope > details > details\.about"\)/, "a link to the spec opens the line");
+});
