@@ -45,6 +45,9 @@ export const signal = `name: Spectree signal
 on:
   pull_request_review:
     types: [submitted, edited, dismissed]
+  # A comment can be a command, such as "/spectree for".
+  issue_comment:
+    types: [created, edited]
 
 permissions: {}
 
@@ -52,7 +55,7 @@ jobs:
   signal:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "A review was recorded."
+      - run: echo "A review or a comment was recorded."
 `;
 
 function defaultBranch(dir: string): string {
@@ -120,7 +123,7 @@ export function main(argv: string[], dir = process.cwd()): number {
     if (cmd === "preview") {
       const out = arg || "_spectree_site";
       mkdirSync(out, { recursive: true });
-      const data = buildData(specs, [], config, "local/preview", new Date().toISOString());
+      const data = buildData(specs, [], config, "local/preview", new Date().toISOString(), {});
       writeFileSync(join(out, "index.html"), renderHtml(data, config));
       writeFileSync(join(out, "roadmap.json"), JSON.stringify(data, null, 2) + "\n");
       console.log(`wrote ${out}/index.html`);

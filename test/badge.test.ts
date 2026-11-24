@@ -10,17 +10,18 @@ import { run } from "../src/run.ts";
 
 const node = (id: string, status: DashNode["status"], kind: DashNode["kind"] = "leaf", children: DashNode[] = []): DashNode => ({
   id, name: id, title: id, kind, level: "epic", status, horizon: "", open: [],
-  counts: { done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 0 }, summary: "", criteria: [], children,
+  counts: { done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 0 }, summary: "", criteria: [], children, body: "", up: 0, down: 0, thread: "",
 });
 const NEXT = { spec: "votes", approved: "code", code: "review" } as const;
 const proposal = (number: number, phase: "spec" | "approved" | "code", next: DashPr["next"] = NEXT[phase]): DashPr => ({
   number, title: "", author: "", url: "", phase, status: "proposed", valid: next !== "fix", for: 0, against: 0, forPeople: 0, againstPeople: 0,
-  next, votes: [], nodes: [],
+  next, votes: [], nodes: [], opened: "", since: "", days: 0, days_in_step: 0, stale: false, taken_by: "", review: null,
 });
+// Only the tree and the proposals are read by the badge.
 const data = (proposals: DashPr[]): DashData => ({
   repository: "acme/engine", generated: "", threshold: 1, max_against: 0, levels: ["epic"], proposals,
   tree: [node("search", "done", "group", [node("search/full", "done"), node("search/fast", "in_progress")]), node("ranking", "planned"), node("docs", "done")],
-});
+} as unknown as DashData);
 
 test("badge: the shields.io endpoint format, with specs done and proposals open", () => {
   assert.deepEqual(badgeOf(data([proposal(3, "code"), proposal(4, "approved")])), {

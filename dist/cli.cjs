@@ -1960,7 +1960,7 @@ ${indent}${line}` : "\n";
           str += ",";
         } else if (ctx.options.trailingComma) {
           if (ctx.options.lineWidth > 0) {
-            reqNewline || (reqNewline = lines.reduce((sum, line) => sum + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
+            reqNewline || (reqNewline = lines.reduce((sum2, line) => sum2 + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
           }
           if (reqNewline) {
             str += ",";
@@ -1976,7 +1976,7 @@ ${indent}${line}` : "\n";
         return start + end;
       } else {
         if (!reqNewline) {
-          const len = lines.reduce((sum, line) => sum + line.length + 2, 2);
+          const len = lines.reduce((sum2, line) => sum2 + line.length + 2, 2);
           reqNewline = ctx.options.lineWidth > 0 && len > ctx.options.lineWidth;
         }
         if (reqNewline) {
@@ -6344,15 +6344,15 @@ var require_parser = __commonJS({
     var node_process = require("process");
     var cst = require_cst();
     var lexer = require_lexer();
-    function includesToken(list, type) {
-      for (let i = 0; i < list.length; ++i)
-        if (list[i].type === type)
+    function includesToken(list2, type) {
+      for (let i = 0; i < list2.length; ++i)
+        if (list2[i].type === type)
           return true;
       return false;
     }
-    function findNonEmptyIndex(list) {
-      for (let i = 0; i < list.length; ++i) {
-        switch (list[i].type) {
+    function findNonEmptyIndex(list2) {
+      for (let i = 0; i < list2.length; ++i) {
+        switch (list2[i].type) {
           case "space":
           case "comment":
           case "newline":
@@ -7378,7 +7378,9 @@ var DEFAULTS = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "" }
+  review: { threshold: 1, count_author: true },
+  demand: { enabled: true, top: 3 },
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 }
 };
 function loadConfig(text) {
   const errors = [];
@@ -7431,15 +7433,57 @@ function loadConfig(text) {
         if (value === "fail" || value === "close" || value === "allow") config.on_missing_spec = value;
         else errors.push("on_missing_spec must be fail, close or allow");
         break;
+      case "review": {
+        const d = value;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          for (const k of Object.keys(d)) if (!["threshold", "count_author"].includes(k)) errors.push(`unknown key: review.${k}`);
+          if (d.threshold !== void 0) {
+            if (typeof d.threshold === "number" && d.threshold >= 0) config.review.threshold = d.threshold;
+            else errors.push("review.threshold must be a number, 0 or more");
+          }
+          if (d.count_author !== void 0) {
+            if (typeof d.count_author === "boolean") config.review.count_author = d.count_author;
+            else errors.push("review.count_author must be true or false");
+          }
+        } else errors.push("review must be a mapping");
+        break;
+      }
+      case "demand": {
+        const d = value;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          for (const k of Object.keys(d)) if (!["enabled", "top"].includes(k)) errors.push(`unknown key: demand.${k}`);
+          if (d.enabled !== void 0) {
+            if (typeof d.enabled === "boolean") config.demand.enabled = d.enabled;
+            else errors.push("demand.enabled must be true or false");
+          }
+          if (d.top !== void 0) {
+            if (typeof d.top === "number" && Number.isInteger(d.top) && d.top >= 0) config.demand.top = d.top;
+            else errors.push("demand.top must be a whole number, 0 or more");
+          }
+        } else errors.push("demand must be a mapping");
+        break;
+      }
       case "dashboard": {
         const d = value;
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== void 0) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
+          }
+          if (d.collapse_over !== void 0) {
+            if (typeof d.collapse_over === "number" && Number.isInteger(d.collapse_over) && d.collapse_over >= 0) config.dashboard.collapse_over = d.collapse_over;
+            else errors.push("dashboard.collapse_over must be a whole number, 0 or more");
+          }
+          if (d.recent_days !== void 0) {
+            if (typeof d.recent_days === "number" && Number.isInteger(d.recent_days) && d.recent_days >= 0) config.dashboard.recent_days = d.recent_days;
+            else errors.push("dashboard.recent_days must be a whole number, 0 or more");
+          }
+          if (d.stale_days !== void 0) {
+            if (typeof d.stale_days === "number" && Number.isInteger(d.stale_days) && d.stale_days >= 0) config.dashboard.stale_days = d.stale_days;
+            else errors.push("dashboard.stale_days must be a whole number, 0 or more");
           }
           if (d.project !== void 0) {
             if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;
@@ -7454,6 +7498,211 @@ function loadConfig(text) {
     }
   }
   return { config, errors };
+}
+
+// src/find.ts
+function parseView(query, known) {
+  const p = new URLSearchParams(query);
+  const pick = (key, list2) => {
+    const v = p.get(key);
+    return v !== null && list2.includes(v) ? v : null;
+  };
+  return { q: p.get("q") ?? "", status: pick("status", known.statuses) ?? "", horizon: pick("horizon", known.horizons), top: pick("top", known.tops) ?? "" };
+}
+function writeView(view) {
+  const p = new URLSearchParams();
+  if (view.q.trim()) p.set("q", view.q);
+  if (view.status) p.set("status", view.status);
+  if (view.horizon !== null) p.set("horizon", view.horizon);
+  if (view.top) p.set("top", view.top);
+  return p.toString();
+}
+function matches(node, view) {
+  for (const word of view.q.toLowerCase().split(/\s+/)) if (word && !node.text.includes(word)) return false;
+  if (view.status && node.status !== view.status) return false;
+  if (view.horizon !== null && !(node.status === "planned" && node.horizon === view.horizon)) return false;
+  if (view.top && node.id !== view.top && !node.id.startsWith(view.top + "/")) return false;
+  return true;
+}
+function visible(nodes, view, anchor) {
+  const ids = new Set(nodes.map((n) => n.id));
+  const above = (id) => {
+    const out = [];
+    for (let i = id.lastIndexOf("/"); i > 0; i = id.lastIndexOf("/", i - 1)) if (ids.has(id.slice(0, i))) out.push(id.slice(0, i));
+    return out;
+  };
+  const active = view.q.trim() !== "" || view.status !== "" || view.horizon !== null || view.top !== "";
+  const leaves = nodes.filter((n) => n.kind === "leaf");
+  const hits = active ? leaves.filter((n) => matches(n, view)) : leaves;
+  const show = new Set(active ? [] : ids);
+  const open = /* @__PURE__ */ new Set();
+  if (active)
+    for (const n of hits) {
+      show.add(n.id);
+      for (const a of above(n.id)) show.add(a), open.add(a);
+    }
+  if (anchor && ids.has(anchor)) {
+    show.add(anchor);
+    for (const a of above(anchor)) show.add(a), open.add(a);
+  }
+  const label = !active ? "" : hits.length ? `${hits.length} of ${leaves.length} ${leaves.length === 1 ? "spec" : "specs"}` : "No specs match.";
+  return { active, show: [...show], open: [...open], matched: hits.length, total: leaves.length, label };
+}
+function findScript(known) {
+  const json = JSON.stringify(known).replace(/</g, "\\u003c");
+  return `${parseView.toString()}
+${writeView.toString()}
+${matches.toString()}
+${visible.toString()}
+(function (parseView, writeView, visible) {
+  var form = document.getElementById("find");
+  if (!form) return;
+  var KNOWN = ${json};
+  var count = document.getElementById("find-count"), clear = document.getElementById("find-clear");
+  var nodes = [].map.call(document.querySelectorAll("li.node"), function (li) {
+    var d = li.querySelector(":scope > details");
+    return { id: li.id.slice(5), kind: li.dataset.kind, status: li.dataset.status, horizon: li.dataset.horizon, text: li.dataset.text, li: li, details: d, was: d ? d.open : false };
+  });
+  function anchor() {
+    var h = decodeURIComponent(location.hash.slice(1));
+    return h.indexOf("spec-") === 0 ? h.slice(5) : "";
+  }
+  function read() {
+    var h = form.elements.horizon ? form.elements.horizon.value : "";
+    return { q: form.elements.q.value, status: form.elements.status.value, horizon: h ? h.slice(2) : null, top: form.elements.top.value };
+  }
+  function fill(v) {
+    form.elements.q.value = v.q;
+    form.elements.status.value = v.status;
+    form.elements.top.value = v.top;
+    if (form.elements.horizon) form.elements.horizon.value = v.horizon === null ? "" : "h:" + v.horizon;
+  }
+  function apply(v) {
+    var r = visible(nodes, v, anchor()), show = new Set(r.show), open = new Set(r.open);
+    nodes.forEach(function (n) {
+      n.li.hidden = !show.has(n.id);
+      if (n.details) n.details.open = open.has(n.id) || (!r.active && n.was);
+    });
+    count.textContent = r.label;
+    clear.hidden = !r.active;
+  }
+  function changed() {
+    var v = read(), s = writeView(v);
+    history.replaceState(null, "", location.pathname + (s ? "?" + s : "") + location.hash);
+    apply(v);
+  }
+  function jump() {
+    var a = anchor(), n = a && document.getElementById("spec-" + a);
+    if (!n) return;
+    var d = n.querySelector(":scope > details");
+    if (d) d.open = true;
+    var about = n.querySelector(":scope > details > details.about");
+    if (about) about.open = true;
+    n.scrollIntoView();
+  }
+  form.hidden = false;
+  form.addEventListener("input", changed);
+  form.addEventListener("submit", function (e) { e.preventDefault(); });
+  form.addEventListener("reset", function () { setTimeout(changed, 0); });
+  window.addEventListener("hashchange", function () { apply(read()); jump(); });
+  var first = parseView(location.search, KNOWN);
+  fill(first);
+  apply(first);
+  jump();
+})(${parseView.name}, ${writeView.name}, ${visible.name});`;
+}
+
+// src/markdown.ts
+var esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function linkTarget(href, resolve) {
+  const h = href.trim();
+  if (/^(https?:\/\/|mailto:)/i.test(h)) return h;
+  if (!h || h.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith("//")) return null;
+  return resolve(h.replace(/^(\.?\/)+/, ""));
+}
+function inlineMarkdown(text, resolve) {
+  const code = [];
+  let s = esc(text).replace(/`([^`]+)`/g, (_, c) => `\0${code.push(c) - 1}\0`);
+  s = s.replace(/\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))*)\)/g, (_, label, href) => {
+    const raw = href.replace(/&(amp|lt|gt|quot);/g, (_2, e) => ({ amp: "&", lt: "<", gt: ">", quot: '"' })[e]);
+    const to = linkTarget(raw, resolve);
+    return to ? `<a href="${esc(to)}">${label}</a>` : label;
+  });
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^\w*])\*([^*\s][^*]*)\*(?!\w)/g, "$1<em>$2</em>");
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${code[Number(i)]}</code>`);
+}
+function list(items, resolve) {
+  const base = items[0].indent;
+  let out = "";
+  let tag = "";
+  for (let i = 0; i < items.length; ) {
+    const want = items[i].ordered ? "ol" : "ul";
+    if (want !== tag) out += `${tag ? `</${tag}>` : ""}<${tag = want}>`;
+    let j = i + 1;
+    while (j < items.length && items[j].indent > base) j++;
+    out += `<li>${inlineMarkdown(items[i].text, resolve)}${j > i + 1 ? list(items.slice(i + 1, j), resolve) : ""}</li>`;
+    i = j;
+  }
+  return `${out}</${tag}>`;
+}
+var ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+var cells = (line) => line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+function renderMarkdown(src, resolve) {
+  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  const out = [];
+  const starts = (l) => /^(#{1,6}\s|```|>|\|)/.test(l) || ITEM.test(l);
+  for (let i = 0; i < lines.length; ) {
+    const line = lines[i];
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+    if (line.startsWith("```")) {
+      const body = [];
+      for (i++; i < lines.length && !lines[i].startsWith("```"); i++) body.push(lines[i]);
+      i++;
+      out.push(`<pre><code>${esc(body.join("\n"))}</code></pre>`);
+      continue;
+    }
+    const h = /^(#{1,6})\s+(.*?)\s*#*$/.exec(line);
+    if (h) {
+      const level = h[1].length <= 2 ? 4 : h[1].length === 3 ? 5 : 6;
+      out.push(`<h${level}>${inlineMarkdown(h[2], resolve)}</h${level}>`);
+      i++;
+      continue;
+    }
+    if (line.trim().startsWith("|") && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      const head = cells(line);
+      const rows = [];
+      for (i += 2; i < lines.length && lines[i].trim().startsWith("|"); i++) rows.push(cells(lines[i]));
+      out.push(
+        `<table><thead><tr>${head.map((c) => `<th>${inlineMarkdown(c, resolve)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${head.map((_, k) => `<td>${inlineMarkdown(r[k] ?? "", resolve)}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+      );
+      continue;
+    }
+    if (ITEM.test(line)) {
+      const items = [];
+      for (; i < lines.length; i++) {
+        const m = ITEM.exec(lines[i]);
+        if (m) items.push({ indent: m[1].length, ordered: /\d/.test(m[2]), text: m[3] });
+        else if (lines[i].trim() && /^\s+/.test(lines[i]) && !lines[i].trim().startsWith("```")) items[items.length - 1].text += " " + lines[i].trim();
+        else if (!lines[i].trim() && i + 1 < lines.length && (ITEM.test(lines[i + 1]) || /^\s+\S/.test(lines[i + 1])) && !lines[i + 1].trim().startsWith("```")) continue;
+        else break;
+      }
+      out.push(list(items, resolve));
+      continue;
+    }
+    if (line.startsWith(">")) {
+      const body = [];
+      for (; i < lines.length && lines[i].startsWith(">"); i++) body.push(lines[i].replace(/^>\s?/, ""));
+      out.push(`<blockquote>${inlineMarkdown(body.join(" "), resolve)}</blockquote>`);
+      continue;
+    }
+    const para = [];
+    for (; i < lines.length && lines[i].trim() && !(para.length && starts(lines[i])); i++) para.push(lines[i].trim());
+    out.push(`<p>${inlineMarkdown(para.join(" "), resolve)}</p>`);
+  }
+  return out.join("\n");
 }
 
 // src/tree.ts
@@ -7530,6 +7779,21 @@ function levelName(id, levels) {
 }
 
 // src/dashboard.ts
+var THREAD_LABEL = "spectree";
+var TEMPLATE = `---
+title: "What it does, in a few words"
+paths:
+  - src/**
+criteria:
+  - id: first
+    text: "One thing that is true when this is built."
+    tests: [test/first.test.ts]
+---
+
+Why this is needed, in a paragraph.
+
+Not in this spec: what it leaves out.
+`;
 function summaryOf(body, max = 360) {
   const para = body.split(/\r?\n\s*\r?\n/).map((p) => p.trim()).find((p) => p && !/^(#|```|[-*+] |\d+\. |\||>)/.test(p));
   if (!para) return "";
@@ -7539,12 +7803,57 @@ function summaryOf(body, max = 360) {
 function nextOf(r) {
   if (r.errors.length) return "fix";
   if (r.phase === "spec") return "votes";
-  if (r.phase === "code") return "review";
+  if (r.phase === "code") return r.review?.passed && r.statuses.phase.state === "success" && r.statuses.scope.state === "success" ? "merge" : "review";
   return r.statuses.phase.state === "pending" ? "code" : "merge";
 }
 var statusOf = (phase) => phase === "code" ? "in_progress" : phase === "approved" ? "approved" : "proposed";
 var zero = () => ({ done: 0, planned: 0, proposed: 0, approved: 0, in_progress: 0 });
-function buildData(mainSpecs, prs, cfg, repository, now) {
+var FIRST_HORIZONS = ["now", "next", "later"];
+var sum = (c) => Object.values(c).reduce((a, b) => a + b, 0);
+function overviewOf(roots) {
+  const all = { id: "", title: "All", total: 0, counts: zero(), horizons: {} };
+  const rows = roots.map((root) => {
+    const horizons2 = {};
+    const walk = (n) => {
+      if (n.kind === "leaf" && n.status === "planned") horizons2[n.horizon] = (horizons2[n.horizon] ?? 0) + 1;
+      n.children.forEach(walk);
+    };
+    walk(root);
+    for (const s of ORDER) all.counts[s] += root.counts[s];
+    for (const [h, v] of Object.entries(horizons2)) all.horizons[h] = (all.horizons[h] ?? 0) + v;
+    return { id: root.id, title: root.title, total: sum(root.counts), counts: { ...root.counts }, horizons: horizons2 };
+  });
+  all.total = sum(all.counts);
+  const rank = (h) => h === "" ? 2 : FIRST_HORIZONS.includes(h) ? 0 : 1;
+  const horizons = Object.keys(all.horizons).sort(
+    (a, b) => rank(a) - rank(b) || (rank(a) === 0 ? FIRST_HORIZONS.indexOf(a) - FIRST_HORIZONS.indexOf(b) : a < b ? -1 : a > b ? 1 : 0)
+  );
+  return { horizons, rows, all };
+}
+function recentOf(flat, proposals, merges, cfg, now) {
+  const window = cfg.dashboard.recent_days;
+  if (!merges || window <= 0) return { recent: null, pace: null };
+  const within = (at, days2) => at !== "" && Date.parse(now) - Date.parse(at) <= days2 * 864e5;
+  const recent = [];
+  const pace = { d30: 0, d90: 0 };
+  for (const m of merges) {
+    const now_ = (status) => m.added.filter((id) => flat.get(id)?.kind === "leaf" && flat.get(id).status === status);
+    const done = [.../* @__PURE__ */ new Set([...now_("done"), ...m.built.filter((id) => flat.get(id)?.status === "done")])];
+    if (within(m.at, 30)) pace.d30 += done.length;
+    if (within(m.at, 90)) pace.d90 += done.length;
+    if (!within(m.at, window)) continue;
+    for (const [kind, ids] of [["done", done], ["planned", now_("planned")]])
+      if (ids.length) recent.push({ kind, at: m.at, title: ids.length === 1 ? flat.get(ids[0]).title : m.title, url: m.url, ids });
+  }
+  for (const p of proposals) {
+    const past = p.next !== "votes" && p.next !== "fix";
+    const at = past ? p.since : p.opened;
+    if (within(at, window)) recent.push({ kind: past ? "approved" : "proposed", at, title: p.title, url: p.url, ids: p.nodes });
+  }
+  recent.sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || (a.title < b.title ? -1 : 1));
+  return { recent, pace };
+}
+function buildData(mainSpecs, prs, cfg, repository, now, extra = {}) {
   const flat = /* @__PURE__ */ new Map();
   const make = (id, title, kind, status, body, criteria, horizon = "") => ({
     id,
@@ -7558,6 +7867,10 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     counts: zero(),
     summary: summaryOf(body),
     criteria,
+    body,
+    up: 0,
+    down: 0,
+    thread: "",
     children: []
   });
   for (const s of Object.values(mainSpecs))
@@ -7567,7 +7880,18 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     const r = p.result;
     if (r.phase === "none" || r.phase === "missing") continue;
     const status = statusOf(r.phase);
+    const next = nextOf(r);
+    const opened = p.opened ?? "";
+    const since = next !== "votes" && next !== "fix" && r.record ? r.record.at : opened;
+    const daysSince = (t) => t ? Math.max(0, Math.floor((Date.parse(now) - Date.parse(t)) / 864e5)) : 0;
+    const stale = cfg.dashboard.stale_days > 0 && daysSince(since) > cfg.dashboard.stale_days;
     proposals.push({
+      opened,
+      since,
+      days: daysSince(opened),
+      days_in_step: daysSince(since),
+      stale,
+      taken_by: p.taken ?? "",
       number: p.number,
       title: p.title,
       author: p.author,
@@ -7579,9 +7903,10 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
       against: r.tally?.against ?? 0,
       forPeople: r.tally?.forPeople ?? 0,
       againstPeople: r.tally?.againstPeople ?? 0,
-      next: nextOf(r),
+      next,
       votes: (r.tally?.votes ?? []).map(({ user, vote, weight }) => ({ user, vote, weight })),
-      nodes: r.nodes.map((n) => n.id)
+      nodes: r.nodes.map((n) => n.id),
+      review: r.review ? { for: r.review.for, against: r.review.against, needed: cfg.review.threshold, passed: r.review.passed } : null
     });
     for (const n of r.nodes) {
       const own = n.planned !== null && r.phase !== "spec" ? "planned" : status;
@@ -7599,22 +7924,98 @@ function buildData(mainSpecs, prs, cfg, repository, now) {
     (parent ? parent.children : roots).push(node);
   }
   const roll = (n) => {
-    if (n.kind === "leaf" || !n.children.length) {
-      if (n.kind === "leaf") n.counts[n.status] = 1;
-      return n.counts;
-    }
+    if (n.kind === "leaf") n.counts[n.status] = 1;
     for (const c of n.children) for (const [k, v] of Object.entries(roll(c))) n.counts[k] += v;
     return n.counts;
   };
   roots.forEach(roll);
-  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, proposals, tree: roots };
+  const wanted = [];
+  if (cfg.demand.enabled) {
+    for (const node of flat.values()) {
+      const t = extra.threads?.[node.id];
+      if (t) node.thread = t.url;
+      const d = mainSpecs[node.id] ? t : extra.reactions?.[node.open.find((o) => o.change === "added")?.pr ?? -1] ?? t;
+      if (d) node.up = d.up, node.down = d.down;
+      if (node.up > 0 && node.status !== "done") wanted.push({ id: node.id, title: node.title, up: node.up });
+    }
+    wanted.sort((a, b) => b.up - a.up || (a.id < b.id ? -1 : 1));
+    wanted.length = Math.min(wanted.length, cfg.demand.top);
+  }
+  return { repository, generated: now, threshold: cfg.threshold, max_against: cfg.max_against, levels: cfg.levels, branch: extra.branch || "main", wanted, ...recentOf(flat, proposals, extra.merges, cfg, now), proposals, overview: overviewOf(roots), tree: roots };
 }
-var esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-var inline = (s) => esc(s).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+var esc2 = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+var inline = (s) => esc2(s).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 var LABEL = { done: "Done", planned: "Planned", in_progress: "In progress", approved: "Approved", proposed: "Proposed" };
 var ORDER = ["done", "in_progress", "approved", "proposed", "planned"];
-var pill = (s, text = LABEL[s]) => `<span class="pill ${s}">${esc(text)}</span>`;
+var pill = (s, text = LABEL[s]) => `<span class="pill ${s}">${esc2(text)}</span>`;
 var plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+var STAGES = ["in_progress", "approved", "proposed"];
+function renderOverview(o, first) {
+  if (!o.rows.length) return "";
+  const num = (n, top, status, horizon) => `<td class="num">${n ? `<a href="?${esc2(writeView({ q: "", status, horizon, top }))}#specs">${n}</a>` : ""}</td>`;
+  const row = (r) => {
+    const pct = r.total ? Math.round(r.counts.done / r.total * 100) : 0;
+    const name = r.id ? `<a href="#spec-${esc2(r.id)}">${esc2(r.title)}</a>` : esc2(r.title);
+    return `<tr${r.id ? "" : ' class="all"'}><th scope="row">${name}</th><td class="progress"><span class="bar"><span style="width:${pct}%"></span></span> ${r.counts.done} of ${r.total} done</td>${STAGES.map(
+      (s) => num(r.counts[s], r.id, s, null)
+    ).join("")}${o.horizons.map((h) => num(r.horizons[h] ?? 0, r.id, "", h)).join("")}</tr>`;
+  };
+  const stages = STAGES.map((s) => `<th class="num stage"${o.horizons.length ? ' rowspan="2"' : ""}>${LABEL[s]}</th>`).join("");
+  const span = o.horizons.length ? ' rowspan="2"' : "";
+  const planned = o.horizons.length ? `<th class="num group" colspan="${o.horizons.length}">Planned</th></tr><tr>${o.horizons.map((h) => `<th class="num">${esc2(h || "no horizon")}</th>`).join("")}` : "";
+  return `<h2>Overview</h2>
+<div class="box"><table class="overview"><thead><tr><th${span}>${esc2(first)}</th><th${span}>Progress</th>${stages}${planned}</tr></thead><tbody>${o.rows.map(row).join("")}${row(o.all)}</tbody></table></div>`;
+}
+var HORIZON_CLASS = { now: "now", next: "next", later: "later" };
+var bar = (done, total) => `<span class="bar"><span style="width:${total ? Math.round(done / total * 100) : 0}%"></span></span>`;
+var STEPS = ["votes", "fix", "code", "review", "merge"];
+var STEP_TITLE = {
+  votes: "Needs votes",
+  fix: "Needs a fix to the spec",
+  code: "Approved, waiting for code",
+  review: "In code review",
+  merge: "Ready to merge"
+};
+var days = (n) => n === 0 ? "today" : n === 1 ? "1 day" : `${n} days`;
+function renderSpecs(nodes) {
+  const codes = nodes.map((n) => `<code>${esc2(n)}</code>`).join(" ");
+  if (nodes.length <= 3) return `<div>${codes}</div>`;
+  const parts = nodes.map((n) => n.split("/"));
+  let shared = 0;
+  while (parts.every((p) => p.length > shared + 1 && p[shared] === parts[0][shared])) shared++;
+  const where = shared ? ` in <code>${esc2(parts[0].slice(0, shared).join("/"))}</code>` : "";
+  return `<details class="specs"><summary>${nodes.length} specs${where}</summary>${codes}</details>`;
+}
+var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var RECENT_SHOWN = 8;
+function renderRecent(data, window) {
+  if (!data.recent || !data.pace) return "";
+  const pace = `Specs done: ${data.pace.d30} in the last 30 days, ${data.pace.d90} in the last 90.`;
+  if (!data.recent.length) return `<h2>Lately</h2>
+<p class="muted">Nothing changed in the last ${plural(window, "day")}. ${pace}</p>`;
+  const line = (e) => {
+    const d = new Date(e.at);
+    return `<li><span class="muted when">${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}</span> ${pill(e.kind)} <a href="${esc2(e.url)}">${esc2(e.title)}</a>${e.ids.length > 1 ? ` <span class="muted">${e.ids.length} specs</span>` : ""}</li>`;
+  };
+  const more = data.recent.length - RECENT_SHOWN;
+  return `<h2>Lately</h2>
+<ul class="recent">${data.recent.slice(0, RECENT_SHOWN).map(line).join("")}</ul><p class="muted">${more > 0 ? `And ${more} more in the last ${plural(window, "day")}. ` : ""}${pace}</p>`;
+}
+function renderQueue(data) {
+  if (!data.proposals.length) return `<p class="muted">No open spec pull requests.</p>`;
+  const row = (p) => {
+    const age = p.opened ? ` \xB7 opened ${p.days ? days(p.days) + " ago" : "today"}${p.days_in_step !== p.days ? ` \xB7 ${p.days_in_step ? days(p.days_in_step) : "since today"} in this step` : ""}` : "";
+    return `<tr><td><a href="${p.url}">#${p.number} ${esc2(p.title)}</a><div class="muted">by ${esc2(p.author)}${age}${p.stale ? ' <span class="pill bad">stale</span>' : ""}</div>${renderSpecs(p.nodes)}${p.taken_by && p.next === "code" ? `<div class="muted">Taken by @${esc2(p.taken_by)}</div>` : ""}</td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
+      p,
+      data.threshold
+    )}</td><td>${renderNext(p)}</td></tr>`;
+  };
+  const groups = STEPS.map((step) => {
+    const list2 = data.proposals.filter((p) => p.next === step).sort((a, b) => b.days_in_step - a.days_in_step || a.number - b.number);
+    return list2.length ? `<tbody data-step="${step}"><tr class="step"><th colspan="4">${STEP_TITLE[step]} <span class="muted">${list2.length}</span></th></tr>${list2.map(row).join("")}</tbody>` : "";
+  }).join("");
+  return `<table class="queue"><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead>${groups}</table>`;
+}
 var NEXT = {
   fix: "A fix to the spec",
   votes: "Votes",
@@ -7623,37 +8024,95 @@ var NEXT = {
   merge: "Merge"
 };
 var CONTRIBUTING = "https://github.com/beamreach-ai/spectree/blob/main/docs/contributing-with-specs.md";
-function renderDetail(n) {
-  if (!n.summary && !n.criteria.length) return "";
-  const summary = n.summary ? `<p>${inline(n.summary)}</p>` : "";
-  const criteria = n.criteria.length ? `<ol class="criteria">${n.criteria.map((c) => `<li><span>${inline(c.text)}</span> <span class="muted">Tested in ${c.tests.map((t) => `<code>${esc(t)}</code>`).join(", ")}</span></li>`).join("")}</ol>` : "";
-  return `<div class="detail">${summary}${criteria}</div>`;
+var enc = encodeURIComponent;
+var newSpecUrl = (c, under) => `${c.repoUrl}/new/${enc(c.branch)}?filename=${enc(`${c.root}/${under ? under + "/" : ""}new-spec/spec.md`)}&value=${enc(TEMPLATE)}`;
+function renderMore(n, c) {
+  const specPath = `${c.root}/${n.id}/spec.md`;
+  const adds = n.open.find((o) => o.change === "added");
+  const inMain = !adds;
+  const whole = n.body.trim() && n.body.replace(/\s+/g, " ").trim() !== n.summary ? `<details class="whole"><summary>The whole spec</summary><div class="md">${renderMarkdown(n.body, (p) => `${c.repoUrl}/blob/${enc(c.branch)}/${p}`)}</div></details>` : "";
+  const stands = [n.status === "planned" && n.horizon ? `Planned: ${esc2(n.horizon)}` : LABEL[n.status]];
+  if (adds) stands.push(`proposed in <a href="${c.repoUrl}/pull/${adds.pr}">#${adds.pr}</a>, not in the default branch yet`);
+  for (const o of n.open) {
+    const p = c.prs.get(o.pr);
+    const tally2 = p ? `: ${p.for} of ${c.threshold} for, ${p.against} against` : "";
+    if (o !== adds) stands.push(`<a href="${c.repoUrl}/pull/${o.pr}">#${o.pr}</a> proposes to ${o.change === "removed" ? "remove it" : "change it"}${tally2}; the text here is the default branch's`);
+    else if (tally2) stands.push(`vote${tally2}`);
+  }
+  if (c.demand && (n.up || n.down)) stands.push(`${n.up} \u{1F44D}${n.down ? `, ${n.down} \u{1F44E}` : ""}`);
+  const act = [];
+  const link = (href, text, title = "") => act.push(`<a href="${esc2(href)}"${title ? ` title="${esc2(title)}"` : ""}>${text}</a>`);
+  const editUrl = `${c.repoUrl}/edit/${enc(c.branch)}/${specPath}`;
+  if (inMain) {
+    link(editUrl, "Edit", "Opens GitHub's editor; saving proposes the change in a pull request");
+    if (c.demand)
+      link(
+        n.thread || `${c.repoUrl}/issues/new?title=${enc(n.id)}&labels=${THREAD_LABEL}&body=${enc(`The thread of the spec \`${n.id}\`: ${c.repoUrl}/blob/${c.branch}/${specPath}
+
+A \u{1F44D} on this post says you want it. Discussion goes below.`)}`,
+        n.thread ? "Discuss or \u{1F44D}" : "Start its thread",
+        "A thumbs-up on the thread's first post says you want this spec"
+      );
+    link(newSpecUrl(c, n.id), "Add a spec below");
+    if (n.kind === "leaf" && n.status === "planned") link(editUrl, "Build this", "Remove planned, add paths and criteria, and bring the code in the same pull request");
+  } else {
+    link(`${c.repoUrl}/pull/${adds.pr}/files`, "Edit", "The spec is in this pull request; changes go there");
+    link(`${c.repoUrl}/pull/${adds.pr}`, c.demand ? "Discuss or \u{1F44D}" : "Discuss", "A thumbs-up on the pull request's description says you want this spec");
+    if (n.kind === "leaf" && n.status === "approved") link(`${c.repoUrl}/pull/${adds.pr}`, "Take it", `Write the code in that pull request, or in your own whose description says Implements: #${adds.pr}`);
+  }
+  return `${whole}<p class="muted stands">${stands.join(" \xB7 ")}</p><p class="actions">${act.join(" ")}</p>`;
 }
-function renderNode(n, repoUrl, root) {
-  const counts = n.kind === "group" ? ORDER.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ") : "";
+function renderDetail(n, c) {
+  const where = `<p class="muted where"><span class="level">${esc2(n.level)}</span> <code>${esc2(n.id)}</code></p>`;
+  const summary = n.summary ? `<p>${inline(n.summary)}</p>` : "";
+  const criteria = n.criteria.length ? `<ol class="criteria">${n.criteria.map((c2) => `<li><span>${inline(c2.text)}</span> <span class="muted">Tested in ${c2.tests.map((t) => `<code>${esc2(t)}</code>`).join(", ")}</span></li>`).join("")}</ol>` : "";
+  return `<div class="detail">${where}${summary}${criteria}${renderMore(n, c)}</div>`;
+}
+function renderFind(data) {
+  if (!data.tree.length) return "";
+  const option = (value, text) => `<option value="${esc2(value)}">${esc2(text)}</option>`;
+  const o = data.overview;
+  const horizon = o.horizons.length ? `<select name="horizon" aria-label="Horizon">${option("", "Any horizon")}${o.horizons.map((h) => option(`h:${h}`, h || "no horizon")).join("")}</select>` : "";
+  return `<form class="find" id="find" role="search" hidden><input type="search" name="q" placeholder="Search specs\u2026" aria-label="Search specs" autocomplete="off"><select name="status" aria-label="Status">${option(
+    "",
+    "Any status"
+  )}${ORDER.map((s) => option(s, LABEL[s])).join("")}</select>${horizon}<select name="top" aria-label="${esc2(data.levels[0] ?? "spec")}">${option(
+    "",
+    `Any ${data.levels[0] ?? "spec"}`
+  )}${o.rows.map((r) => option(r.id, r.title)).join("")}</select><span class="muted" id="find-count" aria-live="polite"></span><button type="reset" id="find-clear" hidden>Clear</button></form>`;
+}
+function renderNode(n, c) {
+  const { repoUrl, root, closed } = c;
+  const total = ORDER.reduce((a, s) => a + n.counts[s], 0);
+  const counts = n.kind === "group" ? `${bar(n.counts.done, total)}<span class="muted">${n.counts.done} of ${total} done</span> ${STAGES.filter((s) => n.counts[s]).map((s) => pill(s, `${n.counts[s]} ${LABEL[s].toLowerCase()}`)).join(" ")}${n.counts.planned ? ` <span class="muted">${n.counts.planned} planned</span>` : ""}` : "";
+  const mark = n.status !== "planned" ? pill(n.status) : `<span class="pill hz hz-${HORIZON_CLASS[n.horizon] ?? "other"}">${esc2(n.horizon || "Planned")}</span>`;
   const open = n.open.map((o) => `<a class="pr" href="${repoUrl}/pull/${o.pr}">#${o.pr} ${o.change === "added" ? "" : o.change + ", "}${LABEL[o.status].toLowerCase()}</a>`).join(" ");
   const inMain = (n.status === "done" || n.status === "planned") && !n.open.some((o) => o.change === "added");
   const href = inMain ? `${repoUrl}/blob/HEAD/${root}/${n.id}/spec.md` : n.open[0] ? `${repoUrl}/pull/${n.open[0].pr}` : "#";
   const many = n.criteria.length ? `<span class="muted">${plural(n.criteria.length, "criterion", "criteria")}</span>` : "";
-  const head = `<span class="level">${esc(n.level)}</span> <a class="title" href="${href}">${esc(n.title)}</a> <code>${esc(n.name)}</code> ${n.kind === "leaf" ? pill(n.status, n.status === "planned" && n.horizon ? `Planned: ${n.horizon}` : LABEL[n.status]) : counts || pill(n.status)} ${inMain || n.kind === "group" ? open : ""} ${many}`;
-  const detail = renderDetail(n);
-  const kids = n.children.length ? `<ul>${n.children.map((c) => renderNode(c, repoUrl, root)).join("")}</ul>` : "";
-  if (!detail && !kids) return `<li class="node"><div class="row plain">${head}</div></li>`;
-  return `<li class="node"><details${kids ? " open" : ""}><summary class="row">${head}</summary>${detail}${kids}</details></li>`;
+  const head = `<a class="title" title="${esc2(n.title)}" href="${href}">${esc2(n.title)}</a> ${n.kind === "leaf" ? mark : counts} ${inMain || n.kind === "group" ? open : ""} ${many}${c.demand && n.up ? ` <span class="want" title="${plural(n.up, "person wants", "people want")} this">\u{1F44D} ${n.up}</span>` : ""}`;
+  const detail = renderDetail(n, c);
+  const kids = n.children.length ? `<ul>${n.children.map((k) => renderNode(k, c)).join("")}</ul>` : "";
+  const text = `${n.title} ${n.id} ${n.summary}`.toLowerCase();
+  const li = `<li class="node" id="spec-${esc2(n.id)}" data-kind="${n.kind}" data-status="${n.status}" data-horizon="${esc2(n.horizon)}" data-text="${esc2(text)}">`;
+  const about = n.kind === "leaf" && kids && detail ? `<details class="about"><summary>About this spec</summary>${detail}</details>` : detail;
+  return `${li}<details${kids && !closed ? " open" : ""}><summary class="row">${head}</summary>${about}${kids}</details></li>`;
 }
 function renderVotes(p, threshold) {
-  const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
-  const lines = [`<div>${p.for} of ${threshold} for, ${p.against} against</div>`];
+  const who = (v) => p.votes.filter((x) => x.vote === v).map((x) => `@${esc2(x.user)}${x.weight === 1 ? "" : ` (weight ${x.weight})`}`).join(", ");
+  const code = p.review ? `<div>Code: ${p.review.for} of ${p.review.needed} for, ${p.review.against} against</div>` : "";
+  if (p.next !== "votes" && p.next !== "fix" && p.votes.every((v) => v.user === p.author)) return `<div>${code ? "Spec approved" : "Approved"}</div>${code}`;
+  const lines = [`<div>${code ? "Spec: " : ""}${p.for} of ${threshold} for, ${p.against} against</div>`];
   if (who("for")) lines.push(`<div class="muted">For: ${who("for")}</div>`);
   if (who("against")) lines.push(`<div class="muted">Against: ${who("against")}</div>`);
-  return lines.join("");
+  return lines.join("") + code;
 }
 function renderNext(p) {
   const hint = {
     fix: "The spec has problems. The vote starts when it is valid.",
-    votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against.`,
+    votes: `<a href="${p.url}/files">Review the spec</a>: Approve is for, Request changes is against. Or comment <code>/spectree for</code> or <code>/spectree against</code> on the pull request.`,
     code: "The spec is approved and frozen. The code goes in this pull request, or in another with <code>Implements: #" + p.number + "</code>.",
-    review: "The code is in. It is reviewed like any other code.",
+    review: p.review ? `<a href="${p.url}/files">Review the code</a>: Approve on the latest commit, or comment <code>/spectree for</code>.` : "The code is in. It is reviewed like any other code.",
     merge: "Nothing left. It can merge."
   };
   return `<div class="next">${NEXT[p.next]}</div><div class="muted">${hint[p.next]}</div>`;
@@ -7661,31 +8120,47 @@ function renderNext(p) {
 function renderHtml(data, cfg, serverUrl = "https://github.com") {
   const repoUrl = `${serverUrl}/${data.repository}`;
   const name = data.repository.split("/").pop();
-  const total = zero();
-  const walk = (n) => {
-    if (n.kind === "leaf") total[n.status]++;
-    n.children.forEach(walk);
+  const first = data.levels[0] ? data.levels[0][0].toUpperCase() + data.levels[0].slice(1) : "Spec";
+  const over = cfg.dashboard.collapse_over;
+  const closed = over > 0 && data.overview.all.total > over;
+  const known = { statuses: ORDER, horizons: data.overview.horizons, tops: data.overview.rows.map((r) => r.id) };
+  const ctx = {
+    repoUrl,
+    root: cfg.root,
+    closed,
+    branch: data.branch,
+    demand: cfg.demand.enabled,
+    threshold: data.threshold,
+    prs: new Map(data.proposals.map((p) => [p.number, p]))
   };
-  data.tree.forEach(walk);
-  const proposals = data.proposals.length ? `<table><thead><tr><th>Pull request</th><th>Status</th><th>Vote</th><th>Waiting for</th></tr></thead><tbody>${data.proposals.map(
-    (p) => `<tr><td><a href="${p.url}">#${p.number} ${esc(p.title)}</a><div class="muted">by ${esc(p.author)}</div><div>${p.nodes.map((n) => `<code>${esc(n)}</code>`).join(" ")}</div></td><td>${pill(p.status)}${p.valid ? "" : ' <span class="pill bad">spec not valid</span>'}</td><td>${renderVotes(
-      p,
-      data.threshold
-    )}</td><td>${renderNext(p)}</td></tr>`
-  ).join("")}</tbody></table>` : `<p class="muted">No open spec pull requests.</p>`;
-  const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, repoUrl, cfg.root)).join("")}</ul>` : `<p class="muted">No specs yet. Add the first one under <code>${esc(cfg.root)}/</code>.</p>`;
+  const wanted = data.wanted.length ? `<h2>Most wanted</h2>
+<ol class="wanted">${data.wanted.map((w) => `<li><a href="#spec-${esc2(w.id)}">${esc2(w.title)}</a> <span class="want">\u{1F44D} ${w.up}</span></li>`).join("")}</ol>` : "";
+  const proposals = renderQueue(data);
+  const fresh = !data.tree.length && !data.proposals.length;
+  const tree = data.tree.length ? `<ul class="tree">${data.tree.map((n) => renderNode(n, ctx)).join("")}</ul>` : `<div class="empty"><p><strong>No specs yet.</strong> A spec is a file, <code>${esc2(cfg.root)}/&lt;name&gt;/spec.md</code>, that says what one part of the project does and names the tests that prove it. Add the first one in a pull request.</p><p>To check the tree on your machine:</p><pre>npx github:beamreach-ai/spectree validate
+npx github:beamreach-ai/spectree tree</pre></div>`;
   const against = data.max_against === 0 ? "none against" : `at most ${data.max_against} against`;
-  const intro = `Every change to ${esc(name)} starts as a spec under <code>${esc(cfg.root)}/</code>, proposed in a pull request. People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
+  const intro = `<details class="how" id="how" open><summary>How changes are made here</summary><ol class="steps"><li><strong>Propose.</strong> Every change to ${esc2(
+    name
+  )} starts as a spec under <code>${esc2(cfg.root)}/</code>, proposed in a pull request.</li><li><strong>Vote.</strong> People vote with reviews: Approve is for, Request changes is against. A spec passes with ${plural(
     data.threshold,
     "weighted vote"
-  )} for and ${against}. People with write access weigh 1, and everyone else's vote is shown. After the vote, the code is added to the same pull request and spec and code merge together. <a href="${CONTRIBUTING}">How to propose a spec and vote</a>.`;
+  )} for and ${against}. People with write access weigh 1, and everyone else's vote is shown.</li><li><strong>Build.</strong> After the vote, the code is added to the same pull request and spec and code merge together.</li></ol><p class="muted"><a href="${CONTRIBUTING}">How to propose a spec and vote</a>.</p></details>`;
+  const howScript = `(function () {
+  var how = document.getElementById("how");
+  if (!how) return;
+  try {
+    if (localStorage.getItem("spectree-how") === "closed") how.open = false;
+    how.addEventListener("toggle", function () { localStorage.setItem("spectree-how", how.open ? "open" : "closed"); });
+  } catch (e) {}
+})();`;
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(name)} roadmap</title>
-<meta name="description" content="The roadmap of ${esc(data.repository)}: every spec, its status, and the open proposals with their votes.">
+<title>${esc2(name)} roadmap</title>
+<meta name="description" content="The roadmap of ${esc2(data.repository)}: every spec, its status, and the open proposals with their votes.">
 <style>
 :root{--bg:#fbfcfd;--fg:#14202b;--muted:#5b6b79;--line:#dce4ea;--card:#fff;--link:#00699f;
 --done:#1d7a4f;--done-bg:#e3f4ea;--prog:#8a5a00;--prog-bg:#fdf0d2;--appr:#00699f;--appr-bg:#e1f1fa;--prop:#5b4bb5;--prop-bg:#ece9fb;--bad:#a8323a;--bad-bg:#fbe6e7}
@@ -7698,9 +8173,29 @@ h1{font-size:28px;margin:0 0 4px}
 h2{font-size:18px;margin:36px 0 12px}
 a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .muted{color:var(--muted);font-size:14px}
-.intro{max-width:720px;margin:12px 0 0}
+.how{margin:16px 0 0}.how>summary{font-weight:600;font-size:14px;color:var(--muted)}.how>summary::before{content:"\u25B8 "}.how[open]>summary::before{content:"\u25BE "}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:10px 0 6px;padding:0;list-style:none;counter-reset:step}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px}
+.how p{margin:0}
+@media (max-width:720px){.steps{grid-template-columns:1fr}}
+.empty pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.queue .step th{padding-top:16px;font-size:14px;color:var(--fg);border-bottom:1px solid var(--line)}.queue tbody:first-of-type .step th{padding-top:6px}
+.specs summary{font-size:14px;color:var(--muted)}.specs summary::before{content:"\u25B8 "}.specs[open] summary::before{content:"\u25BE "}
+.hz{color:var(--muted);background:var(--line)}.hz::before{content:"\u25CF ";font-size:10px;vertical-align:1px}
+.hz-now{color:var(--done);background:var(--done-bg)}.hz-next{color:var(--appr);background:var(--appr-bg)}.hz-later{color:var(--muted);background:var(--line)}.hz-other{color:var(--prog);background:var(--prog-bg)}
+.where{margin:4px 0}
+.button{display:inline-block;padding:6px 14px;border-radius:8px;background:var(--link);color:var(--bg);font-weight:600;font-size:15px}.button:hover{text-decoration:none;opacity:.9}
+.want{font-size:13px;white-space:nowrap}
+.recent li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:4px 0}.recent .when{min-width:52px}
+.wanted{margin:0;padding-left:24px;list-style:decimal}.wanted li{margin:4px 0}
+.actions{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}.actions a{font-weight:600}
+.stands{margin:8px 0 4px}
+.whole>summary{font-size:14px;font-weight:600;color:var(--link)}.whole>summary::before{content:"\u25B8 "}.whole[open]>summary::before{content:"\u25BE "}
+.md{font-size:15px;overflow-x:auto}.md h4,.md h5,.md h6{margin:14px 0 4px;font-size:15px}.md ul,.md ol,.tree .md ul{margin:6px 0;padding-left:22px;list-style:revert;border-left:0}.md li{margin:3px 0}
+.md pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto}.md pre code{color:var(--fg)}
+.md table{min-width:0;width:auto}.md th,.md td{padding:6px 14px 6px 0;font-size:14px;width:auto}.md td:first-child,.md td:last-child{width:auto}
+.md blockquote{margin:6px 0;padding-left:12px;border-left:3px solid var(--line);color:var(--muted)}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
-.summary{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
 .pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .pill.done{color:var(--done);background:var(--done-bg)}.pill.in_progress{color:var(--prog);background:var(--prog-bg)}
 .pill.approved{color:var(--appr);background:var(--appr-bg)}.pill.proposed{color:var(--prop);background:var(--prop-bg)}
@@ -7711,10 +8206,25 @@ table{border-collapse:collapse;width:100%;min-width:640px}
 th,td{text-align:left;padding:10px 12px 10px 0;border-bottom:1px solid var(--line);vertical-align:top;font-size:15px}
 th{font-size:13px;color:var(--muted);font-weight:600}tr:last-child td{border-bottom:0}
 td:first-child{width:38%}td:last-child{width:32%}
+.overview{min-width:560px}.overview th,.overview td,.overview td:last-child{width:auto;padding-right:16px;vertical-align:middle}
+.overview tbody th{font-size:15px;color:var(--fg);border-bottom:1px solid var(--line)}
+.overview .num{text-align:right;font-variant-numeric:tabular-nums}.overview .group{text-align:center;border-bottom:0;padding-bottom:0}
+.overview .progress{white-space:nowrap;color:var(--muted);font-size:14px;width:1%}.overview .stage{white-space:nowrap;width:1%}
+.overview .all th,.overview .all td{font-weight:600;border-bottom:0}
+.bar{display:inline-block;width:96px;height:8px;margin-right:8px;border-radius:4px;background:var(--line);overflow:hidden;vertical-align:middle}
+.bar span{display:block;height:100%;background:var(--done)}
+.node{scroll-margin-top:12px}
+.overview td a{display:block;color:inherit}
+.find{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}.find[hidden],.find [hidden]{display:none}
+.find input,.find select,.find button{font:inherit;font-size:15px;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;max-width:100%}
+.find input{flex:1 1 220px;min-width:0}.find select{max-width:240px}.find button{cursor:pointer;color:var(--link)}
 .next{font-weight:600}
 ul{list-style:none;margin:0;padding:0}
 .tree ul{margin-left:4px;padding-left:16px;border-left:1px solid var(--line)}
-.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:7px 0}
+.row{display:flex;align-items:center;gap:6px 8px;padding:7px 0}.row>*{flex:none}
+.row .title{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .bar{width:56px;margin-right:0}
+@media (max-width:640px){.row{flex-wrap:wrap}.row .title{flex-basis:100%}}
 .row.plain{padding-left:15px}
 summary{cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}
 summary.row::before{content:"";width:0;height:0;margin-right:2px;border-left:5px solid var(--muted);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
@@ -7722,26 +8232,35 @@ details[open]>summary.row::before{transform:rotate(90deg)}
 .level{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);min-width:56px}
 .title{font-weight:600;color:var(--fg)}
 .pr{font-size:13px}
+.about>summary{margin:2px 0 4px 29px;font-size:13px;color:var(--muted)}.about>summary:hover{color:var(--fg)}.about[open]>summary{margin-bottom:6px}
 .detail{margin:0 0 10px 15px;padding:2px 0 4px 14px;border-left:2px solid var(--line);font-size:15px;max-width:760px}
 .detail p{margin:6px 0}
 .criteria{margin:6px 0;padding-left:20px}.criteria li{margin:4px 0}.criteria .muted{display:block;font-size:13px}
 footer{margin-top:40px}
-@media (max-width:640px){table,tbody,tr,td{display:block}thead{display:none}table{min-width:0}
-td,td:first-child,td:last-child{width:auto;padding:3px 0;border:0}tr{padding:10px 0;border-bottom:1px solid var(--line)}tr:last-child{border-bottom:0}}
+@media (max-width:640px){table:not(.overview),table:not(.overview) tbody,table:not(.overview) tr,table:not(.overview) td{display:block}table:not(.overview) thead{display:none}table:not(.overview){min-width:0}
+table:not(.overview) th{display:block;border:0}table:not(.overview) td{width:auto;padding:3px 0;border:0}table:not(.overview) tr{padding:10px 0;border-bottom:1px solid var(--line)}table:not(.overview) tr:last-child{border-bottom:0}}
 </style>
 </head>
 <body>
 <main>
-<h1>${esc(name)} roadmap</h1>
-<div class="muted"><a href="${repoUrl}">${esc(data.repository)}</a></div>
-<p class="intro">${intro}</p>
-<div class="summary">${ORDER.map((s) => pill(s, `${total[s]} ${LABEL[s].toLowerCase()}`)).join("")}</div>
-<h2>Open proposals</h2>
-<div class="box">${proposals}</div>
-<h2>Specs</h2>
+<h1>${esc2(name)} roadmap</h1>
+<div class="muted"><a href="${repoUrl}">${esc2(data.repository)}</a></div>
+<p><a class="button" href="${esc2(newSpecUrl(ctx, ""))}">Propose a spec</a></p>
+${intro}
+${wanted}
+${renderOverview(data.overview, first)}
+${renderRecent(data, cfg.dashboard.recent_days)}
+${fresh ? "" : `<h2>Open proposals</h2>
+<div class="box">${proposals}</div>`}
+<h2 id="specs">Specs</h2>
+${renderFind(data)}
 <div class="box">${tree}</div>
-<footer class="muted">Updated ${esc(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
+<footer class="muted">Updated ${esc2(data.generated.replace("T", " ").replace(/:\d\d(\.\d+)?Z$/, " UTC"))}. A spec is done when it is in the default branch together with its code. A planned spec is agreed and not built yet. Data: <a href="roadmap.json">roadmap.json</a>. Built by <a href="https://github.com/beamreach-ai/spectree">spectree</a>.</footer>
 </main>
+${data.tree.length ? `<script>
+${findScript(known)}
+${howScript}
+</script>` : ""}
 </body>
 </html>
 `;
@@ -7750,6 +8269,21 @@ td,td:first-child,td:last-child{width:auto;padding:3px 0;border:0}tr{padding:10p
 // src/run.ts
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
+
+// src/commands.ts
+var HELP = [
+  "Commands, as the first line of a comment on a spec pull request:",
+  "",
+  "| Comment | Effect |",
+  "|---|---|",
+  "| `/spectree for` | a vote for, the same as an approving review. Once the spec is approved, it approves the code |",
+  '| `/spectree against <reason>` | a vote against, the same as "Request changes". Once the spec is approved, it is about the code |',
+  "| `/spectree withdraw` | takes your vote back |",
+  "| `/spectree take` | says you will write the code of an approved spec |",
+  "| `/spectree status` | asks for the tally and what the pull request waits for |"
+].join("\n");
+
+// src/run.ts
 var CONFIG_FILE = ".spectree.yml";
 function readSpecs(dir, cfg) {
   const specs = {};
@@ -7811,6 +8345,9 @@ var signal = `name: Spectree signal
 on:
   pull_request_review:
     types: [submitted, edited, dismissed]
+  # A comment can be a command, such as "/spectree for".
+  issue_comment:
+    types: [created, edited]
 
 permissions: {}
 
@@ -7818,7 +8355,7 @@ jobs:
   signal:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "A review was recorded."
+      - run: echo "A review or a comment was recorded."
 `;
 function defaultBranch(dir) {
   try {
@@ -7881,7 +8418,7 @@ function main(argv, dir = process.cwd()) {
     if (cmd === "preview") {
       const out = arg || "_spectree_site";
       (0, import_node_fs2.mkdirSync)(out, { recursive: true });
-      const data = buildData(specs, [], config, "local/preview", (/* @__PURE__ */ new Date()).toISOString());
+      const data = buildData(specs, [], config, "local/preview", (/* @__PURE__ */ new Date()).toISOString(), {});
       (0, import_node_fs2.writeFileSync)((0, import_node_path2.join)(out, "index.html"), renderHtml(data, config));
       (0, import_node_fs2.writeFileSync)((0, import_node_path2.join)(out, "roadmap.json"), JSON.stringify(data, null, 2) + "\n");
       console.log(`wrote ${out}/index.html`);

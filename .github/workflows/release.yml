@@ -1,0 +1,43 @@
+name: Release
+# Every commit on main that passes CI becomes v1, so repositories that call the workflow at @v1, this one included,
+# get it without anyone moving the tag by hand. The roadmap page is then rebuilt with the new code.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  move-v1:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Move v1 forward
+        id: move
+        run: |
+          old=$(git rev-parse refs/tags/v1)
+          if [ "$old" = "$SHA" ]; then echo "v1 is already at $SHA"; exit 0; fi
+          # Only ever forward, and only to a commit that is on main.
+          git merge-base --is-ancestor "$old" "$SHA" || { echo "$SHA is not ahead of v1 ($old); leaving the tag"; exit 0; }
+          git merge-base --is-ancestor "$SHA" origin/main || { echo "$SHA is not on main; leaving the tag"; exit 0; }
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v1" -f sha="$SHA" -F force=true --silent
+          echo "v1: $old -> $SHA"
+          echo "moved=true" >> "$GITHUB_OUTPUT"
+      - name: Rebuild the roadmap page with the new code
+        if: steps.move.outputs.moved == 'true'
+        run: gh workflow run roadmap.yml --ref main

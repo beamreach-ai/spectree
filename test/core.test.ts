@@ -149,6 +149,8 @@ test("flow: propose, early code, approval, spec change resets, scope, merge-read
   r = evaluatePr({ ...coding, files: [spec("roadmap/search/incremental/spec.md"), code("src/index/inc.py")] }, DEFAULTS);
   assert.match(r.statuses.scope.description, /1 test named by the spec does not exist/);
   r = evaluatePr({ ...coding, files: [spec("roadmap/search/incremental/spec.md"), code("src/index/inc.py"), code("tests/index/test_incremental.py")] }, DEFAULTS);
+  assert.deepEqual([r.statuses.spec.state, r.statuses.phase.state, r.statuses.scope.state], ["success", "pending", "success"], "the code waits for its own approval");
+  r = evaluatePr({ ...coding, reviews: [approve("maint", "head3")], files: [spec("roadmap/search/incremental/spec.md"), code("src/index/inc.py"), code("tests/index/test_incremental.py")] }, DEFAULTS);
   assert.deepEqual([r.statuses.spec.state, r.statuses.phase.state, r.statuses.scope.state], ["success", "success", "success"]);
 
   // "Request changes" in the code phase is code review, not a vote.
@@ -172,7 +174,7 @@ test("flow: who may write code", () => {
   const coding = pr({ record, files: [spec("roadmap/search/incremental/spec.md"), code("src/index/inc.py"), code("tests/index/test_incremental.py")] });
   const cfg = { ...DEFAULTS, implementation: "maintainers" as const };
   assert.equal(evaluatePr(coding, cfg).statuses.phase.state, "failure");
-  assert.equal(evaluatePr({ ...coding, authorCanWrite: true }, cfg).statuses.phase.state, "success");
+  assert.equal(evaluatePr({ ...coding, authorCanWrite: true, weights: { outsider: 1, maint: 1 } }, cfg).statuses.phase.state, "success");
 });
 
 test("flow: taking over an approved spec with Implements", () => {

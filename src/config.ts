@@ -11,7 +11,9 @@ export interface Config {
   exempt_paths: string[];
   exempt_authors: string[];
   on_missing_spec: "fail" | "close" | "allow";
-  dashboard: { enabled: boolean; path: string; host: "github-pages" | "cloudflare"; project: string };
+  review: { threshold: number; count_author: boolean };
+  demand: { enabled: boolean; top: number };
+  dashboard: { enabled: boolean; path: string; host: "github-pages" | "cloudflare"; project: string; collapse_over: number; stale_days: number; recent_days: number };
 }
 
 export const DEFAULTS: Config = {
@@ -25,7 +27,9 @@ export const DEFAULTS: Config = {
   exempt_paths: ["**/*.md", ".github/**"],
   exempt_authors: ["dependabot[bot]", "renovate[bot]"],
   on_missing_spec: "fail",
-  dashboard: { enabled: true, path: "", host: "github-pages", project: "" },
+  review: { threshold: 1, count_author: true },
+  demand: { enabled: true, top: 3 },
+  dashboard: { enabled: true, path: "", host: "github-pages", project: "", collapse_over: 40, stale_days: 30, recent_days: 30 },
 };
 
 /** Reads `.spectree.yml` text. Unknown keys and wrong types are reported, never guessed. */
@@ -80,15 +84,57 @@ export function loadConfig(text: string | null): { config: Config; errors: strin
         if (value === "fail" || value === "close" || value === "allow") config.on_missing_spec = value;
         else errors.push("on_missing_spec must be fail, close or allow");
         break;
+      case "review": {
+        const d = value as Record<string, unknown> | null;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          for (const k of Object.keys(d)) if (!["threshold", "count_author"].includes(k)) errors.push(`unknown key: review.${k}`);
+          if (d.threshold !== undefined) {
+            if (typeof d.threshold === "number" && d.threshold >= 0) config.review.threshold = d.threshold;
+            else errors.push("review.threshold must be a number, 0 or more");
+          }
+          if (d.count_author !== undefined) {
+            if (typeof d.count_author === "boolean") config.review.count_author = d.count_author;
+            else errors.push("review.count_author must be true or false");
+          }
+        } else errors.push("review must be a mapping");
+        break;
+      }
+      case "demand": {
+        const d = value as Record<string, unknown> | null;
+        if (d && typeof d === "object" && !Array.isArray(d)) {
+          for (const k of Object.keys(d)) if (!["enabled", "top"].includes(k)) errors.push(`unknown key: demand.${k}`);
+          if (d.enabled !== undefined) {
+            if (typeof d.enabled === "boolean") config.demand.enabled = d.enabled;
+            else errors.push("demand.enabled must be true or false");
+          }
+          if (d.top !== undefined) {
+            if (typeof d.top === "number" && Number.isInteger(d.top) && d.top >= 0) config.demand.top = d.top;
+            else errors.push("demand.top must be a whole number, 0 or more");
+          }
+        } else errors.push("demand must be a mapping");
+        break;
+      }
       case "dashboard": {
         const d = value as Record<string, unknown> | null;
         if (d && typeof d === "object") {
           if (typeof d.enabled === "boolean") config.dashboard.enabled = d.enabled;
           if (typeof d.path === "string") config.dashboard.path = d.path.replace(/^\/+|\/+$/g, "");
-          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
+          for (const k of Object.keys(d)) if (!["enabled", "path", "host", "project", "collapse_over", "stale_days", "recent_days"].includes(k)) errors.push(`unknown key: dashboard.${k}`);
           if (d.host !== undefined) {
             if (d.host === "github-pages" || d.host === "cloudflare") config.dashboard.host = d.host;
             else errors.push("dashboard.host must be github-pages or cloudflare");
+          }
+          if (d.collapse_over !== undefined) {
+            if (typeof d.collapse_over === "number" && Number.isInteger(d.collapse_over) && d.collapse_over >= 0) config.dashboard.collapse_over = d.collapse_over;
+            else errors.push("dashboard.collapse_over must be a whole number, 0 or more");
+          }
+          if (d.recent_days !== undefined) {
+            if (typeof d.recent_days === "number" && Number.isInteger(d.recent_days) && d.recent_days >= 0) config.dashboard.recent_days = d.recent_days;
+            else errors.push("dashboard.recent_days must be a whole number, 0 or more");
+          }
+          if (d.stale_days !== undefined) {
+            if (typeof d.stale_days === "number" && Number.isInteger(d.stale_days) && d.stale_days >= 0) config.dashboard.stale_days = d.stale_days;
+            else errors.push("dashboard.stale_days must be a whole number, 0 or more");
           }
           if (d.project !== undefined) {
             if (typeof d.project === "string" && /^[a-z0-9][a-z0-9-]{0,57}$/.test(d.project)) config.dashboard.project = d.project;

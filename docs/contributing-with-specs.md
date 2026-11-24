@@ -48,12 +48,17 @@ A text that contains a colon needs quotes: `text: "One vote per person: the late
 
 ## 2. The vote
 
-- A reviewer votes for with **Approve** and against with **Request changes**. A plain comment is not a vote.
+- A reviewer votes for with **Approve** and against with **Request changes**.
+- A comment can vote too, when its first line is a command: `/spectree for`, `/spectree against <reason>`, or `/spectree withdraw` to take your vote back. Any other comment is not a vote. `/spectree status` asks the workflow where the pull request stands.
 - Anyone may vote. Each vote has a weight. By default maintainers have weight 1 and everyone else 0, so your vote is shown and the maintainers decide.
 - You count as one vote for your own spec, at your own weight.
 - If you change the spec, the votes start again, because people voted on the earlier text.
 
 The workflow keeps one comment on the pull request with the current count and what happens next.
+
+### Saying you want a spec
+
+A vote decides whether the project agrees to a spec. Wanting one is separate, and open to everyone: on the roadmap page, open the spec and follow **Discuss or 👍** (or **Start its thread**), then add a 👍 to the first post. For a spec that is still a proposal, add the 👍 to the pull request's description. The page shows the count and lists the most wanted specs. It never changes a vote.
 
 ## 3. Add the code
 
@@ -64,7 +69,16 @@ When the vote passes, the pull request gets the label `spec-approved` and the sp
 - Add every test file your criteria name.
 - Do not edit the spec. If the spec turns out to be wrong, change it, and the vote starts again.
 
-From here, reviews are ordinary code review.
+### The code review
+
+The code needs its own approval before the pull request can merge.
+
+- A reviewer approves with **Approve**, or with a comment `/spectree for`. **Request changes** and `/spectree against` are against.
+- It counts only on the latest commit. If you push again, ask for the review again.
+- Weights are the same as in the vote. Your own code counts as approved by you at your own weight, so a maintainer's code passes with nobody else, and yours needs a maintainer when your weight is 0.
+- One vote against with a weight above zero keeps the review open.
+
+The workflow's comment shows the count under the spec vote. A project can turn the code review off or make it stricter; see its `.spectree.yml`.
 
 Some projects set `implementation: maintainers`. There, only maintainers write the code, and your part ends with the approved spec.
 
@@ -74,13 +88,15 @@ Spec and code merge together. Your feature then shows as done on the project's r
 
 ## Taking over an approved spec
 
+To tell others you are writing the code of an approved spec, comment `/spectree take` on its pull request. The roadmap page then shows your name on it. `/spectree withdraw` takes it back.
+
 If a spec is approved and its author does not write the code, you can:
 
 1. Start a branch from their pull request's branch, or copy the spec files unchanged.
 2. Add the code.
 3. Open a pull request with this line in the description: `Implements: #123`, where 123 is the approved pull request.
 
-Your pull request inherits the approval, as long as the spec files are identical to the approved ones.
+Your pull request inherits the approval of the spec, as long as the spec files are identical to the approved ones. Its code needs its own review.
 
 ## Changing an existing feature
 
@@ -95,7 +111,7 @@ Documentation and workflow files need no spec. For another small fix, open the p
 | Check | Waiting | Failed |
 |---|---|---|
 | `spectree/spec` | The vote is open | The spec is not valid, or the code has no approved spec |
-| `spectree/phase` | The spec is approved and needs its code | Code arrived before approval |
+| `spectree/phase` | The spec is approved and needs its code, or the code needs its review | Code arrived before approval |
 | `spectree/scope` | | A file is outside the spec's paths, or a test named by a criterion does not exist |
 
 Each check's description says what to do next.

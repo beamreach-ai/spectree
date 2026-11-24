@@ -1,16 +1,20 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { badgeOf } from "./badge.ts";
+import { type CommandComment, HELP, commandRef, commandReviews, countsNow, parseCommand, sawDigest, takenBy } from "./commands.ts";
 import { type Config, loadConfig } from "./config.ts";
-import { type PrSummary, buildData, renderHtml } from "./dashboard.ts";
+import { type Extra, type Merge, type PrSummary, THREAD_LABEL, buildData, demandOf, renderHtml } from "./dashboard.ts";
 import { type ApprovalRecord, type PrInput, type PrResult, LABEL_APPROVED, evaluatePr, implementsRef } from "./evaluate.ts";
 import type { GitHub } from "./github.ts";
-import { weightOf } from "./tally.ts";
+import { specDigest, weightOf } from "./tally.ts";
 import { type Spec, SPEC_FILE, isSpecFile, parseSpec } from "./tree.ts";
 
 export const CONFIG_FILE = ".spectree.yml";
 const MARKER = "<!-- spectree -->";
 const RECORD = /<!-- spectree-record: (.*?) -->/s;
+const SEEN = /<!-- spectree-seen: (.*?) -->/s;
+/** In the ledger of first sightings, a head commit is kept under this prefix; the other keys are spec digests. */
+const HEAD = "head:";
 const CONTEXTS = { spec: "spectree/spec", phase: "spectree/phase", scope: "spectree/scope" } as const;
 const SKIP = new Set([".git", "node_modules"]);
 
@@ -53,7 +57,7 @@ export function readSpecs(dir: string, cfg: Config): { specs: Record<string, Spe
   return { specs, errors };
 }
 
-function recordIn(comments: any[], bot: string): { id: number; body: string; record: ApprovalRecord | null } | null {
+function recordIn(comments: any[], bot: string): { id: number; body: string; record: ApprovalRecord | null; seen: Record<string, string> } | null {
   const mine = comments.filter((c) => c.user?.login === bot && typeof c.body === "string" && c.body.startsWith(MARKER));
   if (!mine.length) return null;
   const c = mine[mine.length - 1];
@@ -66,12 +70,24 @@ function recordIn(comments: any[], bot: string): { id: number; body: string; rec
       record = null;
     }
   }
-  return { id: c.id, body: c.body, record };
+  let seen: Record<string, string> = {};
+  try {
+    const s = SEEN.exec(c.body);
+    if (s) seen = JSON.parse(s[1]);
+  } catch {
+    seen = {};
+  }
+  return { id: c.id, body: c.body, record, seen };
 }
 
-function commentBody(r: PrResult): string | null {
+function commentBody(r: PrResult, seen: Record<string, string>): string | null {
   if (r.comment === null) return null;
-  return [MARKER, r.comment, ...(r.record ? ["", `<!-- spectree-record: ${JSON.stringify(r.record)} -->`] : [])].join("\n");
+  return [
+    MARKER,
+    r.comment,
+    ...(r.record ? ["", `<!-- spectree-record: ${JSON.stringify(r.record)} -->`] : []),
+    ...(Object.keys(seen).length ? [`<!-- spectree-seen: ${JSON.stringify(seen)} -->`] : []),
+  ].join("\n");
 }
 
 export interface RunOptions {
@@ -101,6 +117,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
   };
 
   const summaries: PrSummary[] = [];
+  const extra: Extra = { branch: o.defaultBranch, threads: {}, reactions: {} };
   let failed = 0;
   for (const pull of await o.gh.openPulls(o.defaultBranch)) {
     const n: number = pull.number;
@@ -116,8 +133,26 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
       const specUnchangedSince: Record<string, boolean> = {};
       const specContents: Record<string, string> = {};
       const weights: Record<string, number> = {};
+      const onHead: Record<string, boolean> = {};
       let implementsRecord: ApprovalRecord | null = null;
+      // Comments that are commands, the workflow's own left out.
+      const commands: CommandComment[] = comments
+        .filter((c: any) => c.user?.login && c.user.login !== o.bot && typeof c.body === "string" && parseCommand(c.body))
+        .map((c: any) => ({
+          id: c.id as number, user: c.user.login as string, body: c.body as string, at: (c.updated_at ?? c.created_at ?? o.now) as string,
+          acked: (c.reactions?.eyes ?? 0) > 0 || (c.reactions?.confused ?? 0) > 0,
+        }));
+      let seen: Record<string, string> = own?.seen ?? {};
+      const counted = new Set<number>();
       if (touchesRoot) {
+        // The spec as it is now, and when the workflow first saw it. A command made before that was made on another text.
+        const digest = specDigest(files.filter((f: { path: string }) => f.path.startsWith(cfg.root + "/")));
+        seen = sawDigest(seen, digest, o.now);
+        for (const c of commands) if ((specUnchangedSince[commandRef(c.id)] = countsNow(c, seen, digest))) counted.add(c.id);
+        // The same for the head commit, which is what a code review is given on. Only the current head is kept.
+        const headKey = HEAD + head;
+        if (!seen[headKey]) seen = { ...Object.fromEntries(Object.entries(seen).filter(([k]) => !k.startsWith(HEAD))), [headKey]: o.now };
+        for (const c of commands) if ((onHead[commandRef(c.id)] = countsNow(c, seen, headKey))) counted.add(c.id);
         reviews = (await o.gh.reviews(n))
           .filter((r: any) => r.user?.login && r.submitted_at)
           .map((r: any) => ({ user: r.user.login as string, state: r.state as string, commit: r.commit_id as string, at: r.submitted_at as string }));
@@ -129,6 +164,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
             const text = await o.gh.fileAt(f.path, `refs/pull/${n}/head`);
             if (text !== null) specContents[f.path] = text;
           }
+        reviews.push(...commandReviews(commands));
         for (const u of new Set([author, ...reviews.map((r) => r.user)])) weights[u.toLowerCase()] = weightOf(u, await writer(u), cfg);
         const ref = implementsRef(pull.body ?? "");
         if (ref && ref !== n) implementsRecord = recordIn(await o.gh.comments(ref), o.bot)?.record ?? null;
@@ -137,7 +173,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
       const result = evaluatePr(
         {
           number: n, author, headSha: head, body: pull.body ?? "", labels: (pull.labels ?? []).map((l: any) => l.name), files, reviews,
-          specUnchangedSince, weights, authorCanWrite: await writer(author), specContents, baseSpecs: main.specs, baseFiles,
+          specUnchangedSince, onHead, weights, authorCanWrite: await writer(author), specContents, baseSpecs: main.specs, baseFiles,
           record: own?.record ?? null, implementsRecord, now: o.now,
         },
         cfg,
@@ -149,7 +185,7 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
         const last = existing.find((e: any) => e.context === CONTEXTS[key]);
         if (!last || last.state !== s.state || last.description !== s.description.slice(0, 140)) await o.gh.setStatus(head, CONTEXTS[key], s.state, s.description, pull.html_url);
       }
-      const body = commentBody(result);
+      const body = commentBody(result, touchesRoot ? seen : {});
       if (body !== null) {
         if (!own) await o.gh.addComment(n, body);
         else if (own.body !== body) await o.gh.updateComment(own.id, body);
@@ -157,8 +193,31 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
       if (result.addLabel) await o.gh.addLabel(n, LABEL_APPROVED);
       if (result.removeLabel) await o.gh.removeLabel(n, LABEL_APPROVED);
       if (result.close) await o.gh.closePull(n);
+      // Each command is answered once: a mark on the comment, and a reply where it asked for one.
+      for (const c of touchesRoot ? commands.filter((x) => !x.acked) : []) {
+        const cmd = parseCommand(c.body)!;
+        try {
+          if (cmd.name === "unknown") {
+            await o.gh.addComment(n, `@${c.user} that is not a command spectree knows.\n\n${HELP}`);
+            await o.gh.addReaction(c.id, "confused");
+          } else if (cmd.name === "status") {
+            const s = result.statuses;
+            await o.gh.addComment(n, `@${c.user} where #${n} stands:\n\n- Spec: ${s.spec.description}\n- Phase: ${s.phase.description}\n- Scope: ${s.scope.description}`);
+            await o.gh.addReaction(c.id, "eyes");
+          } else if (cmd.name === "take" || cmd.name === "withdraw" || counted.has(c.id)) await o.gh.addReaction(c.id, "eyes");
+        } catch (e) {
+          o.log(`::warning::#${n}: the command in comment ${c.id} could not be answered: ${(e as Error).message}`);
+        }
+      }
       o.log(`#${n} ${result.phase}: spec ${result.statuses.spec.state}, phase ${result.statuses.phase.state}, scope ${result.statuses.scope.state}`);
-      summaries.push({ number: n, title: pull.title, author, url: pull.html_url, result });
+      if (cfg.demand.enabled && cfg.dashboard.enabled && touchesRoot) {
+        try {
+          extra.reactions![n] = demandOf((await o.gh.issue(n)).reactions);
+        } catch (e) {
+          o.log(`::warning::#${n}: demand could not be read: ${(e as Error).message}`);
+        }
+      }
+      summaries.push({ number: n, title: pull.title, author, url: pull.html_url, opened: pull.created_at ?? "", taken: touchesRoot ? takenBy(commands) : "", result });
     } catch (e) {
       failed++;
       o.log(`::error::#${n}: ${(e as Error).message}`);
@@ -166,7 +225,45 @@ export async function run(o: RunOptions): Promise<{ failed: number; dashboard: b
   }
 
   if (cfg.dashboard.enabled) {
-    const data = buildData(main.specs, summaries, cfg, `${o.gh.owner}/${o.gh.repo}`, o.now);
+    if (cfg.demand.enabled) {
+      // A spec's thread is the issue labelled spectree whose title is the spec's id. The first one opened wins.
+      try {
+        await o.gh.ensureLabel(THREAD_LABEL, "5b4bb5", "The thread of a spec: discussion, and a thumbs-up to say you want it");
+        const open = new Set(summaries.flatMap((s) => s.result.nodes.map((x) => x.id)));
+        for (const i of (await o.gh.issuesLabeled(THREAD_LABEL)).sort((a: any, b: any) => a.number - b.number)) {
+          const id = String(i.title ?? "").trim().replace(/^`|`$/g, "");
+          if (!main.specs[id] && !open.has(id)) o.log(`thread #${i.number} "${id}" matches no spec; ignored`);
+          else if (!extra.threads![id]) extra.threads![id] = { number: i.number, url: i.html_url, ...demandOf(i.reactions) };
+        }
+      } catch (e) {
+        o.log(`::warning::demand could not be read: ${(e as Error).message}`);
+      }
+    }
+    // What reached the default branch lately: the commits that touched the root, and the specs each one added or started building.
+    const days = Math.max(90, cfg.dashboard.recent_days);
+    if (cfg.dashboard.recent_days > 0) {
+      try {
+        const merges: Merge[] = [];
+        const since = new Date(Date.parse(o.now) - days * 86_400_000).toISOString();
+        for (const c of (await o.gh.commitsSince(cfg.root, since, o.defaultBranch)).slice(0, 60)) {
+          const full = await o.gh.commit(c.sha);
+          const added: string[] = [];
+          const built: string[] = [];
+          for (const f of full.files ?? []) {
+            if (!isSpecFile(cfg.root, f.filename)) continue;
+            const id = f.filename.slice(cfg.root.length + 1, -SPEC_FILE.length - 1);
+            if (f.status === "added") added.push(id);
+            else if (f.status === "modified" && /^-planned:/m.test(f.patch ?? "") && !/^\+planned:/m.test(f.patch ?? "")) built.push(id);
+          }
+          if (added.length || built.length)
+            merges.push({ sha: c.sha, at: full.commit?.committer?.date ?? "", title: String(full.commit?.message ?? "").split("\n")[0], url: full.html_url ?? "", added, built });
+        }
+        extra.merges = merges;
+      } catch (e) {
+        o.log(`::warning::recent changes could not be read: ${(e as Error).message}`);
+      }
+    }
+    const data = buildData(main.specs, summaries, cfg, `${o.gh.owner}/${o.gh.repo}`, o.now, extra);
     const dir = cfg.dashboard.path ? join(o.siteDir, cfg.dashboard.path) : o.siteDir;
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "index.html"), renderHtml(data, cfg, o.serverUrl));
