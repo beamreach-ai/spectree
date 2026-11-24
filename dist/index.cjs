@@ -9253,6 +9253,21 @@ var GitHub = class {
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
 
+// src/badge.ts
+function badgeOf(data) {
+  let done = 0;
+  const walk = (n) => {
+    if (n.kind === "leaf" && n.status === "done") done++;
+    n.children.forEach(walk);
+  };
+  data.tree.forEach(walk);
+  const open = data.proposals.length;
+  const voting = data.proposals.filter((p) => p.next === "votes").length;
+  const parts = [`${done} done`, `${open} open`];
+  if (voting) parts.push(`${voting} ${voting === 1 ? "needs" : "need"} votes`);
+  return { schemaVersion: 1, label: "roadmap", message: parts.join(" \xB7 "), color: voting ? "blueviolet" : "brightgreen" };
+}
+
 // src/commands.ts
 var COMMANDS = ["for", "against", "withdraw", "take", "status"];
 function parseCommand(body) {
@@ -10704,6 +10719,7 @@ ${HELP}`);
     (0, import_node_fs.mkdirSync)(dir, { recursive: true });
     (0, import_node_fs.writeFileSync)((0, import_node_path.join)(dir, "index.html"), renderHtml(data, cfg, o.serverUrl));
     (0, import_node_fs.writeFileSync)((0, import_node_path.join)(dir, "roadmap.json"), JSON.stringify(data, null, 2) + "\n");
+    (0, import_node_fs.writeFileSync)((0, import_node_path.join)(dir, "badge.json"), JSON.stringify(badgeOf(data)) + "\n");
     o.log(`dashboard: ${Object.keys(main2.specs).length} specs in ${o.defaultBranch}, ${data.proposals.length} open proposals`);
   }
   return { failed, dashboard: cfg.dashboard.enabled, host: cfg.dashboard.host, project: cfg.dashboard.project };
