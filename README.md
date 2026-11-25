@@ -77,7 +77,7 @@ spectree's own features are specs under [roadmap/](roadmap/).
 
 ## Status
 
-Version 0.1. The rules are covered by tests that run the whole flow against a simulated GitHub. It has not yet run on a live repository; the first one will be this repository.
+Version 0.1. The rules are covered by tests that run the whole flow against a simulated GitHub. Since 17 November 2026 it runs on this repository: 15 pull requests have gone through the vote, the checks and the roadmap page. Not yet shown live: a pull request from a fork, by an account without write access.
 
 ## Origin
 
